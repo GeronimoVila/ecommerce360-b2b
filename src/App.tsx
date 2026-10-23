@@ -4,6 +4,8 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { PortalLayout } from './components/layout/PortalLayout';
 import { useAuthStore } from './store/authStore';
+import { CatalogPage } from './pages/admin/catalog/CatalogPage';
+import { ProductFormPage } from './pages/admin/catalog/ProductFormPage';
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -39,7 +41,10 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
           <Route element={<PortalLayout />}>
-             <Route path="/admin/dashboard" element={<div>Dashboard Administrativo</div>} />
+            <Route path="/admin/dashboard" element={<div>Dashboard Administrativo</div>} />
+            <Route path="/admin/catalog" element={<CatalogPage />} />
+            <Route path="/admin/catalog/new" element={<ProductFormPage />} />
+            <Route path="/admin/catalog/edit/:id" element={<ProductFormPage />} />
           </Route>
         </Route>
 
