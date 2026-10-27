@@ -6,6 +6,8 @@ import { PortalLayout } from './components/layout/PortalLayout';
 import { useAuthStore } from './store/authStore';
 import { CatalogPage } from './pages/admin/catalog/CatalogPage';
 import { ProductFormPage } from './pages/admin/catalog/ProductFormPage';
+import { ComboFormPage } from './pages/admin/catalog/ComboFormPage';
+import { RestockFormPage } from './pages/admin/inventory/RestockFormPage';
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -45,6 +47,9 @@ function App() {
             <Route path="/admin/catalog" element={<CatalogPage />} />
             <Route path="/admin/catalog/new" element={<ProductFormPage />} />
             <Route path="/admin/catalog/edit/:id" element={<ProductFormPage />} />
+            <Route path="/admin/catalog/combo/new" element={<ComboFormPage />} />
+            <Route path="/admin/catalog/combo/edit/:id" element={<ComboFormPage />} />
+            <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
           </Route>
         </Route>
 

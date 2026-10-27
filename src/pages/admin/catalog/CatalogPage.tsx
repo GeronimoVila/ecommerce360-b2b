@@ -3,18 +3,20 @@ import { Link } from 'react-router-dom';
 import { ProductService } from '../../../services/product.service';
 import type { Product } from '../../../types/product';
 
+type DomainType = 'simple' | 'combo';
 type FilterState = 'ALL' | 'ACTIVE' | 'INACTIVE';
 
 export const CatalogPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  const [domainFilter, setDomainFilter] = useState<DomainType>('simple');
   const [activeFilter, setActiveFilter] = useState<FilterState>('ACTIVE');
 
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      const data = await ProductService.getAll();
+      const data = await ProductService.getAll(domainFilter);
       setProducts(data);
     } catch (error) {
       console.error('[Arquitectura] Error cargando catálogo:', error);
@@ -25,7 +27,7 @@ export const CatalogPage = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [domainFilter]);
 
   const handleToggleStatus = async (product: Product) => {
     try {
@@ -43,63 +45,93 @@ export const CatalogPage = () => {
     return true;
   });
 
-  if (isLoading) {
-    return (
-      <div className="p-4 md:p-6 flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-t-2 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-4 md:p-6 space-y-6">
       
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-800">Gestor de Catálogo</h1>
-        <Link 
-          to="/admin/catalog/new" 
-          className="w-full sm:w-auto text-center bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg shadow-sm hover:bg-blue-700 transition-colors font-medium"
-        >
-          + Nuevo Producto
-        </Link>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gestor de Catálogo</h1>
+          <p className="text-sm text-gray-500">Administración de inventario físico y agrupaciones comerciales B2B.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
+          <Link 
+            to="/admin/catalog/new" 
+            className="w-full sm:w-auto text-center bg-blue-600 text-white px-4 py-2.5 rounded-lg shadow-sm hover:bg-blue-700 transition-colors font-medium text-sm"
+          >
+            + Nuevo Producto
+          </Link>
+          <Link 
+            to="/admin/catalog/combo/new" 
+            className="w-full sm:w-auto text-center bg-slate-800 text-white px-4 py-2.5 rounded-lg shadow-sm hover:bg-slate-900 transition-colors font-medium text-sm"
+          >
+            + Armar Combo
+          </Link>
+        </div>
       </div>
 
-      <div className="flex space-x-2 md:space-x-1 border-b border-gray-200 mb-6 overflow-x-auto hide-scrollbar whitespace-nowrap">
+      <div className="bg-gray-200/70 p-1 rounded-xl flex max-w-md">
+        <button
+          onClick={() => setDomainFilter('simple')}
+          className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+            domainFilter === 'simple'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Productos Físicos
+        </button>
+        <button
+          onClick={() => setDomainFilter('combo')}
+          className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+            domainFilter === 'combo'
+              ? 'bg-white text-blue-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Combos Armados
+        </button>
+      </div>
+
+      <div className="flex space-x-2 border-b border-gray-200 overflow-x-auto pb-1">
         <button
           onClick={() => setActiveFilter('ACTIVE')}
-          className={`py-3 md:py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+          className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeFilter === 'ACTIVE' 
-              ? 'border-blue-600 text-blue-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-blue-600 text-blue-600 font-semibold' 
+              : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
           Activos ({products.filter(p => p.is_active).length})
         </button>
         <button
           onClick={() => setActiveFilter('INACTIVE')}
-          className={`py-3 md:py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+          className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeFilter === 'INACTIVE' 
-              ? 'border-red-600 text-red-600' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-red-600 text-red-600 font-semibold' 
+              : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
           Inactivos ({products.filter(p => !p.is_active).length})
         </button>
         <button
           onClick={() => setActiveFilter('ALL')}
-          className={`py-3 md:py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+          className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
             activeFilter === 'ALL' 
-              ? 'border-gray-800 text-gray-800' 
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              ? 'border-gray-800 text-gray-800 font-semibold' 
+              : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
           Todos ({products.length})
         </button>
       </div>
 
-      {filteredProducts.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500 shadow-sm">
-          No hay productos en esta vista.
+      {isLoading ? (
+        <div className="p-12 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 shadow-sm">
+          No hay {domainFilter === 'simple' ? 'productos físicos' : 'combos'} registrados en esta vista.
         </div>
       ) : (
         <>
@@ -112,9 +144,9 @@ export const CatalogPage = () => {
                 <div className="flex justify-between items-start border-b border-gray-100 pb-3 mb-3">
                   <div>
                     <h3 className="font-bold text-gray-800 text-base">{p.name}</h3>
-                    <p className="text-xs text-gray-500 font-mono mt-1">SKU: {p.sku}</p>
+                    <p className="text-xs text-gray-500 font-mono mt-0.5">SKU: {p.sku}</p>
                   </div>
-                  <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${
+                  <span className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${
                     p.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
                     {p.is_active ? 'Activo' : 'Inactivo'}
@@ -123,32 +155,44 @@ export const CatalogPage = () => {
                 
                 <div className="grid grid-cols-2 gap-3 text-sm mb-4">
                   <div>
-                    <p className="text-gray-500 text-xs">Precio (B2C)</p>
+                    <p className="text-gray-500 text-xs">Precio Venta</p>
                     <p className="font-semibold text-gray-900">${Number(p.base_price).toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 text-xs">Costo (B2B)</p>
+                    <p className="text-gray-500 text-xs">{domainFilter === 'simple' ? 'Costo Compra' : 'Costo Acumulado'}</p>
                     <p className="font-medium text-gray-700">${Number(p.purchase_cost).toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 text-xs">Comisión</p>
+                    <p className="text-gray-500 text-xs">Comisión Vendedor</p>
                     <p className="font-bold text-blue-600">{Number(p.commission_rate)}%</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 text-xs">Stock</p>
+                    <p className="text-gray-500 text-xs">{domainFilter === 'simple' ? 'Stock Físico' : 'Stock Virtual (Redis)'}</p>
                     <p className={`font-medium ${p.physical_stock <= 5 ? 'text-red-600' : 'text-gray-800'}`}>
-                      {p.physical_stock}
+                      {p.physical_stock} u.
                     </p>
                   </div>
                 </div>
 
+                {domainFilter === 'combo' && p.combo_parts && (
+                  <div className="mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs space-y-1">
+                    <p className="font-semibold text-slate-700">Componentes:</p>
+                    {p.combo_parts.map((cp: any, idx: number) => (
+                      <p key={idx} className="text-slate-600">
+                        • {cp.quantity}x {cp.product.name} <span className="text-slate-400">({cp.product.sku})</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex justify-end space-x-3 pt-3 border-t border-gray-100">
                   <Link 
-                    to={`/admin/catalog/edit/${p.id}`} 
+                    to={domainFilter === 'simple' ? `/admin/catalog/edit/${p.id}` : `/admin/catalog/combo/edit/${p.id}`} 
                     className="flex-1 text-center bg-blue-50 text-blue-700 py-2 rounded-lg font-medium text-sm hover:bg-blue-100 transition-colors"
                   >
                     Editar
                   </Link>
+                  
                   <button 
                     onClick={() => handleToggleStatus(p)} 
                     className={`flex-1 text-center py-2 rounded-lg font-medium text-sm transition-colors ${
@@ -164,48 +208,67 @@ export const CatalogPage = () => {
             ))}
           </div>
 
-          <div className="hidden md:block overflow-x-auto bg-white shadow-sm rounded-lg border border-gray-200">
+          <div className="hidden md:block overflow-x-auto bg-white shadow-sm rounded-xl border border-gray-200">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="p-4 text-sm font-semibold text-gray-600">Nombre</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Precio (B2C)</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Costo (B2B)</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Comisión</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Stock</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600">Estado</th>
-                  <th className="p-4 text-sm font-semibold text-gray-600 text-right">Acciones</th>
+                <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  <th className="p-4">Producto / SKU</th>
+                  <th className="p-4">Precio Venta</th>
+                  <th className="p-4">{domainFilter === 'simple' ? 'Costo Compra' : 'Costo Calculado'}</th>
+                  {domainFilter === 'combo' && <th className="p-4">Componentes</th>}
+                  <th className="p-4">Comisión</th>
+                  <th className="p-4">{domainFilter === 'simple' ? 'Stock Físico' : 'Stock Virtual'}</th>
+                  <th className="p-4">Estado</th>
+                  <th className="p-4 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100 text-sm">
                 {filteredProducts.map((p: any) => (
-                  <tr key={p.id} className={`border-b hover:bg-gray-50 transition-colors ${!p.is_active ? 'bg-gray-50 opacity-75' : ''}`}>
-                    <td className="p-4 font-medium text-gray-800">
+                  <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${!p.is_active ? 'bg-gray-50/50 opacity-75' : ''}`}>
+                    <td className="p-4 font-medium text-gray-900">
                       {p.name}
-                      <div className="text-xs text-gray-400 font-mono mt-1">{p.sku}</div>
+                      <div className="text-xs text-gray-400 font-mono mt-0.5">{p.sku}</div>
                     </td>
-                    <td className="p-4">${Number(p.base_price).toFixed(2)}</td>
-                    <td className="p-4">${Number(p.purchase_cost).toFixed(2)}</td>
-                    <td className="p-4 font-semibold text-blue-600">{Number(p.commission_rate)}%</td>
+                    <td className="p-4 font-semibold text-gray-900">${Number(p.base_price).toFixed(2)}</td>
+                    <td className="p-4 text-gray-600">${Number(p.purchase_cost).toFixed(2)}</td>
+                    
+                    {domainFilter === 'combo' && (
+                      <td className="p-4">
+                        <div className="text-xs space-y-0.5 max-w-xs">
+                          {p.combo_parts?.map((cp: any, i: number) => (
+                            <span key={i} className="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded mr-1 mb-1">
+                              {cp.quantity}x {cp.product.sku}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    )}
+
+                    <td className="p-4 font-bold text-blue-600">{Number(p.commission_rate)}%</td>
                     <td className="p-4">
-                      <span className={`font-medium ${p.physical_stock <= 5 ? 'text-red-600' : 'text-gray-800'}`}>
-                        {p.physical_stock}
+                      <span className={`font-semibold ${p.physical_stock <= 5 ? 'text-red-600' : 'text-gray-800'}`}>
+                        {p.physical_stock} u.
                       </span>
                     </td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                      <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
                         p.is_active ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
                       }`}>
                         {p.is_active ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
                     <td className="p-4 text-right space-x-3">
-                      <Link to={`/admin/catalog/edit/${p.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                      
+                      <Link 
+                        to={domainFilter === 'simple' ? `/admin/catalog/edit/${p.id}` : `/admin/catalog/combo/edit/${p.id}`} 
+                        className="text-blue-600 hover:text-blue-800 font-medium"
+                      >
                         Editar
                       </Link>
+
                       <button 
                         onClick={() => handleToggleStatus(p)} 
-                        className={`text-sm font-medium transition-colors ${p.is_active ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'}`}
+                        className={`font-medium ${p.is_active ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'}`}
                       >
                         {p.is_active ? 'Dar de baja' : 'Reactivar'}
                       </button>

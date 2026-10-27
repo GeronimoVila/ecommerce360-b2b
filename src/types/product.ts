@@ -1,4 +1,5 @@
 export interface Product {
+  is_combo: any;
   id: string;
   sku: string;
   name: string;
@@ -12,6 +13,16 @@ export interface Product {
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+  
+  combo_parts?: {
+    quantity: number;
+    product: {
+      sku: string;
+      name: string;
+      purchase_cost?: number;
+      physical_stock?: number;
+    }
+  }[];
 }
 
 export interface ProductFormData {
