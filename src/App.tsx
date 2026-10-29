@@ -8,6 +8,7 @@ import { CatalogPage } from './pages/admin/catalog/CatalogPage';
 import { ProductFormPage } from './pages/admin/catalog/ProductFormPage';
 import { ComboFormPage } from './pages/admin/catalog/ComboFormPage';
 import { RestockFormPage } from './pages/admin/inventory/RestockFormPage';
+import { FinancialRulesPage } from './pages/admin/financial/FinancialRulesPage';
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -50,6 +51,7 @@ function App() {
             <Route path="/admin/catalog/combo/new" element={<ComboFormPage />} />
             <Route path="/admin/catalog/combo/edit/:id" element={<ComboFormPage />} />
             <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
+            <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
           </Route>
         </Route>
 
