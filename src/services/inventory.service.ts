@@ -1,9 +1,9 @@
 import { apiClient } from './apiClient';
 
-const BASE_PATH = 'restock';
+const BASE_PATH = 'products/restock';
 
 export interface RestockPayload {
-  provider_name?: string;
+  provider_name: string;
   reference_document?: string;
   items: { sku: string; quantity: number }[];
 }
