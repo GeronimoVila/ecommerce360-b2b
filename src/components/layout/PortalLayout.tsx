@@ -123,6 +123,34 @@ export const PortalLayout = () => {
               Reglas de pago
             </NavLink>
           )}
+
+          {user?.role === 'ADMIN' && (
+            <NavLink 
+              to="/admin/team"
+              onClick={closeMenu}
+              className={({ isActive }) => 
+                `block py-3 md:py-2 px-4 md:px-3 rounded transition-colors ${
+                  isActive ? 'bg-slate-700 text-white font-medium' : 'hover:bg-slate-700 text-slate-300'
+                }`
+              }
+            >
+              Equipo
+            </NavLink>
+          )}
+
+          {user?.role === 'SELLER' && (
+            <NavLink 
+              to="/portal/profile"
+              onClick={closeMenu}
+              className={({ isActive }) => 
+                `block py-3 md:py-2 px-4 md:px-3 rounded transition-colors ${
+                  isActive ? 'bg-slate-700 text-white font-medium' : 'hover:bg-slate-700 text-slate-300'
+                }`
+              }
+            >
+              Perfil
+            </NavLink>
+          )}
         </nav>
 
         <div className="p-4 bg-slate-900 border-t border-slate-700">

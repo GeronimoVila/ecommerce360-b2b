@@ -9,6 +9,8 @@ import { ProductFormPage } from './pages/admin/catalog/ProductFormPage';
 import { ComboFormPage } from './pages/admin/catalog/ComboFormPage';
 import { RestockFormPage } from './pages/admin/inventory/RestockFormPage';
 import { FinancialRulesPage } from './pages/admin/financial/FinancialRulesPage';
+import { SellersManagementPage } from './pages/admin/team/SellersManagementPage';
+import { MyProfilePage } from './pages/seller/MyProfilePage';
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -39,6 +41,7 @@ function App() {
               </div>
             } />
             <Route path="/portal/presupuestos/nuevo" element={<div>Armador de Presupuestos</div>} />
+            <Route path="/portal/profile" element={<MyProfilePage />} />
           </Route>
         </Route>
 
@@ -52,6 +55,7 @@ function App() {
             <Route path="/admin/catalog/combo/edit/:id" element={<ComboFormPage />} />
             <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
             <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
+            <Route path="/admin/team" element={<SellersManagementPage />} />
           </Route>
         </Route>
 
