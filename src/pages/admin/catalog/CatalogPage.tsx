@@ -16,7 +16,7 @@ export const CatalogPage = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      const data = await ProductService.getAll(domainFilter);
+      const data = await ProductService.getAdminCatalog(domainFilter);
       setProducts(data);
     } catch (error) {
       console.error('[Arquitectura] Error cargando catálogo:', error);

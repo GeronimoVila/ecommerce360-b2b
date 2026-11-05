@@ -4,10 +4,16 @@ import type { Product, ProductFormData } from '../types/product';
 const BASE_PATH = 'products';
 
 export const ProductService = {
-  getAll: async (type?: 'simple' | 'combo'): Promise<Product[]> => {
+  getAdminCatalog: async (type?: 'simple' | 'combo'): Promise<Product[]> => {
     const query = type ? `?type=${type}` : '';
     const response = await apiClient.get(`${BASE_PATH}/admin${query}`);
     return response.data.data; 
+  },
+  
+  getPosCatalog: async (type?: 'simple' | 'combo'): Promise<Product[]> => {
+    const query = type ? `?type=${type}` : '';
+    const response = await apiClient.get(`${BASE_PATH}${query}`);
+    return response.data.data;
   },
   
   getById: async (id: string): Promise<Product> => {

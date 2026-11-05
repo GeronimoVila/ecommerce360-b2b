@@ -11,6 +11,7 @@ import { RestockFormPage } from './pages/admin/inventory/RestockFormPage';
 import { FinancialRulesPage } from './pages/admin/financial/FinancialRulesPage';
 import { SellersManagementPage } from './pages/admin/team/SellersManagementPage';
 import { MyProfilePage } from './pages/seller/MyProfilePage';
+import { CreateBudgetPage } from './pages/budgets/CreateBudgetPage';
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -40,8 +41,8 @@ function App() {
                 <p className="mt-4 text-gray-600">Aquí irán tus métricas de comisiones.</p>
               </div>
             } />
-            <Route path="/portal/presupuestos/nuevo" element={<div>Armador de Presupuestos</div>} />
             <Route path="/portal/profile" element={<MyProfilePage />} />
+            <Route path="/portal/presupuestos/nuevo" element={<CreateBudgetPage />} />
           </Route>
         </Route>
 

@@ -23,7 +23,7 @@ export const ComboFormPage = () => {
   useEffect(() => {
     const initForm = async () => {
       try {
-        const data = await ProductService.getAll('simple');
+        const data = await ProductService.getAdminCatalog('simple');
         const baseProducts = data.filter(p => !p.is_combo && p.is_active);
         setAvailableProducts(baseProducts);
 

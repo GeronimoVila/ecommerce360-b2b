@@ -28,7 +28,7 @@ export const RestockFormPage = () => {
 
   useEffect(() => {
     Promise.all([
-      ProductService.getAll('simple'),
+      ProductService.getAdminCatalog('simple'),
       SupplierService.getAll().catch(err => {
         console.error('ALERTA BACKEND: No se pudieron cargar los proveedores. Verifica que el endpoint GET /suppliers exista.', err);
         return [];
