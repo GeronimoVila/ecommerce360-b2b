@@ -126,6 +126,20 @@ export const PortalLayout = () => {
 
           {user?.role === 'ADMIN' && (
             <NavLink 
+              to="/admin/commissions"
+              onClick={closeMenu}
+              className={({ isActive }) => 
+                `block py-3 md:py-2 px-4 md:px-3 rounded transition-colors ${
+                  isActive ? 'bg-slate-700 text-white font-medium' : 'hover:bg-slate-700 text-slate-300'
+                }`
+              }
+            >
+              Comisiones
+            </NavLink>
+          )}
+
+          {user?.role === 'ADMIN' && (
+            <NavLink 
               to="/admin/team"
               onClick={closeMenu}
               className={({ isActive }) => 
@@ -135,6 +149,20 @@ export const PortalLayout = () => {
               }
             >
               Equipo
+            </NavLink>
+          )}
+
+          {user?.role === 'SELLER' && (
+            <NavLink 
+              to="/portal/presupuestos/nuevo"
+              onClick={closeMenu}
+              className={({ isActive }) => 
+                `block py-3 md:py-2 px-4 md:px-3 rounded transition-colors ${
+                  isActive ? 'bg-slate-700 text-white font-medium' : 'hover:bg-slate-700 text-slate-300'
+                }`
+              }
+            >
+              Crear presupuesto
             </NavLink>
           )}
 

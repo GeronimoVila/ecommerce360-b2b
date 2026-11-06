@@ -12,6 +12,7 @@ import { FinancialRulesPage } from './pages/admin/financial/FinancialRulesPage';
 import { SellersManagementPage } from './pages/admin/team/SellersManagementPage';
 import { MyProfilePage } from './pages/seller/MyProfilePage';
 import { CreateBudgetPage } from './pages/budgets/CreateBudgetPage';
+import { CommissionsPage } from './components/admin/financial/CommissionsPage';
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -57,6 +58,7 @@ function App() {
             <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
             <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
             <Route path="/admin/team" element={<SellersManagementPage />} />
+            <Route path="/admin/commissions" element={<CommissionsPage />} />
           </Route>
         </Route>
 
