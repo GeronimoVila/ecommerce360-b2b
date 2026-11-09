@@ -1,18 +1,21 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { LoginPage } from './pages/auth/LoginPage';
+import { useAuthStore } from './store/authStore';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { PortalLayout } from './components/layout/PortalLayout';
-import { useAuthStore } from './store/authStore';
-import { CatalogPage } from './pages/admin/catalog/CatalogPage';
-import { ProductFormPage } from './pages/admin/catalog/ProductFormPage';
-import { ComboFormPage } from './pages/admin/catalog/ComboFormPage';
-import { RestockFormPage } from './pages/admin/inventory/RestockFormPage';
-import { FinancialRulesPage } from './pages/admin/financial/FinancialRulesPage';
-import { SellersManagementPage } from './pages/admin/team/SellersManagementPage';
-import { MyProfilePage } from './pages/seller/MyProfilePage';
-import { CreateBudgetPage } from './pages/budgets/CreateBudgetPage';
-import { CommissionsPage } from './components/admin/financial/CommissionsPage';
+import { LoginPage } from './pages/auth/LoginPage';
+
+const SellerDashboardPage = lazy(() => import('./pages/seller/dashboard/SellerDashboardPage'));
+const AdminDashboardPage = lazy(() => import('./pages/admin/dashboard/AdminDashboardPage'));
+const MyProfilePage = lazy(() => import('./pages/seller/MyProfilePage').then(module => ({ default: module.MyProfilePage })));
+const CreateBudgetPage = lazy(() => import('./pages/budgets/CreateBudgetPage').then(module => ({ default: module.CreateBudgetPage })));
+const CatalogPage = lazy(() => import('./pages/admin/catalog/CatalogPage').then(module => ({ default: module.CatalogPage })));
+const ProductFormPage = lazy(() => import('./pages/admin/catalog/ProductFormPage').then(module => ({ default: module.ProductFormPage })));
+const ComboFormPage = lazy(() => import('./pages/admin/catalog/ComboFormPage').then(module => ({ default: module.ComboFormPage })));
+const RestockFormPage = lazy(() => import('./pages/admin/inventory/RestockFormPage').then(module => ({ default: module.RestockFormPage })));
+const FinancialRulesPage = lazy(() => import('./pages/admin/financial/FinancialRulesPage').then(module => ({ default: module.FinancialRulesPage })));
+const SellersManagementPage = lazy(() => import('./pages/admin/team/SellersManagementPage').then(module => ({ default: module.SellersManagementPage })));
+const CommissionsPage = lazy(() => import('./components/admin/financial/CommissionsPage').then(module => ({ default: module.CommissionsPage })));
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -31,39 +34,40 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-screen bg-gray-50">
+           <div className="animate-pulse text-gray-500 font-semibold">Cargando módulo...</div>
+        </div>
+      }>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
 
-        <Route element={<ProtectedRoute allowedRoles={['SELLER', 'ADMIN']} />}>
-          <Route element={<PortalLayout />}>
-            <Route path="/portal/dashboard" element={
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800">Bienvenido al Dashboard</h1>
-                <p className="mt-4 text-gray-600">Aquí irán tus métricas de comisiones.</p>
-              </div>
-            } />
-            <Route path="/portal/profile" element={<MyProfilePage />} />
-            <Route path="/portal/presupuestos/nuevo" element={<CreateBudgetPage />} />
+          <Route element={<ProtectedRoute allowedRoles={['SELLER', 'ADMIN']} />}>
+            <Route element={<PortalLayout />}>
+              <Route path="/portal/dashboard" element={<SellerDashboardPage />} />
+              <Route path="/portal/profile" element={<MyProfilePage />} />
+              <Route path="/portal/presupuestos/nuevo" element={<CreateBudgetPage />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route element={<PortalLayout />}>
-            <Route path="/admin/dashboard" element={<div>Dashboard Administrativo</div>} />
-            <Route path="/admin/catalog" element={<CatalogPage />} />
-            <Route path="/admin/catalog/new" element={<ProductFormPage />} />
-            <Route path="/admin/catalog/edit/:id" element={<ProductFormPage />} />
-            <Route path="/admin/catalog/combo/new" element={<ComboFormPage />} />
-            <Route path="/admin/catalog/combo/edit/:id" element={<ComboFormPage />} />
-            <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
-            <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
-            <Route path="/admin/team" element={<SellersManagementPage />} />
-            <Route path="/admin/commissions" element={<CommissionsPage />} />
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+            <Route element={<PortalLayout />}>
+              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin/catalog" element={<CatalogPage />} />
+              <Route path="/admin/catalog/new" element={<ProductFormPage />} />
+              <Route path="/admin/catalog/edit/:id" element={<ProductFormPage />} />
+              <Route path="/admin/catalog/combo/new" element={<ComboFormPage />} />
+              <Route path="/admin/catalog/combo/edit/:id" element={<ComboFormPage />} />
+              <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
+              <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
+              <Route path="/admin/team" element={<SellersManagementPage />} />
+              <Route path="/admin/commissions" element={<CommissionsPage />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
