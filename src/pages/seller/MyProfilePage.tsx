@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import { 
+  User, Lock, Copy, CheckCircle2, Edit3, 
+  ShieldCheck, Wallet, X 
+} from 'lucide-react';
 import { UserService } from '../../services/user.service';
 
 export const MyProfilePage = () => {
@@ -78,140 +82,199 @@ export const MyProfilePage = () => {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center">Cargando perfil...</div>;
-  if (!profile) return <div className="p-8 text-center text-red-500">No se encontró el perfil.</div>;
+  if (isLoading) {
+    return (
+      <div className="p-16 flex justify-center bg-[#F8FAFC] min-h-full">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#5B50D6]"></div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="p-12 text-center text-rose-600 font-medium bg-[#F8FAFC] min-h-full">
+        No se encontró el perfil.
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto relative">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Mi Perfil</h1>
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900 relative">
+      
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-[#5B50D6] flex items-center justify-center shrink-0">
+            <User className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Mi Perfil</h1>
+            <p className="text-sm text-slate-500 mt-1">Configura tus datos comerciales, link de referidos y seguridad de cuenta.</p>
+          </div>
+        </div>
         <button 
           onClick={() => setIsPasswordModalOpen(true)}
-          className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#1A1D27] text-white rounded-xl text-sm font-bold shadow-sm hover:bg-slate-800 transition-colors w-full md:w-auto"
         >
-          Cambiar Contraseña
+          <Lock className="w-4 h-4" /> Cambiar Contraseña
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="bg-slate-800 p-6 text-white flex justify-between items-center">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        
+        <div className="bg-[#1A1D27] p-6 md:p-8 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800">
           <div>
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-2xl font-bold tracking-tight">
               {profile.seller_profile?.first_name} {profile.seller_profile?.last_name}
             </h2>
-            <p className="text-slate-300 mt-1">{profile.email}</p>
+            <p className="text-slate-400 text-sm mt-1">{profile.email}</p>
           </div>
-          <span className="bg-green-500/20 text-green-300 border border-green-500/30 px-3 py-1 rounded-full text-xs font-bold uppercase">
+          <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             Vendedor Activo
           </span>
         </div>
         
-        <div className="p-6 space-y-6">
-          <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-              <p className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Tu Link de Ventas</p>
-              <p className="text-sm text-blue-900 break-all">{B2C_URL}?ref={profile.id}</p>
+        <div className="p-6 md:p-8 space-y-6">
+          
+          <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-1 overflow-hidden">
+              <p className="text-xs font-bold text-[#5B50D6] uppercase tracking-wider flex items-center gap-1.5">
+                <Copy className="w-3.5 h-3.5" /> Tu Link de Ventas (Afiliado)
+              </p>
+              <p className="text-sm font-mono text-slate-700 bg-white/80 border border-indigo-100/60 px-3 py-2 rounded-xl break-all">
+                {B2C_URL}?ref={profile.id}
+              </p>
             </div>
             <button 
               onClick={handleCopyLink}
-              className="whitespace-nowrap px-4 py-2 bg-blue-600 text-white font-bold rounded shadow hover:bg-blue-700 transition-colors"
+              className="whitespace-nowrap px-5 py-2.5 bg-[#5B50D6] text-white font-bold text-xs rounded-xl shadow-sm hover:bg-indigo-700 transition-all flex items-center gap-1.5 shrink-0"
             >
+              {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               {copied ? '¡Copiado!' : 'Copiar Link'}
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="border rounded-lg p-4 bg-gray-50 flex flex-col justify-center">
-              <p className="text-xs font-bold text-gray-500 uppercase">Código Interno (Ref Code)</p>
-              <p className="text-lg font-mono font-semibold text-gray-800 mt-1">{profile.seller_profile?.ref_code}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            
+            <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 flex flex-col justify-center space-y-1">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Código Interno (Ref Code)</p>
+              <p className="text-lg font-mono font-bold text-slate-900">
+                {profile.seller_profile?.ref_code || 'N/A'}
+              </p>
             </div>
             
-            <div className="border rounded-lg p-4 bg-gray-50">
-              <div className="flex justify-between items-start mb-1">
-                <p className="text-xs font-bold text-gray-500 uppercase">CBU / Alias (Para cobros)</p>
+            <div className="border border-slate-200 rounded-2xl p-5 bg-white flex flex-col justify-between space-y-3 shadow-sm">
+              <div className="flex justify-between items-start">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Wallet className="w-3.5 h-3.5" /> CBU / Alias (Para cobros)
+                </p>
                 {!isEditingCBU && (
-                  <button onClick={() => setIsEditingCBU(true)} className="text-blue-600 text-xs font-bold hover:underline">
-                    Editar
+                  <button 
+                    onClick={() => setIsEditingCBU(true)} 
+                    className="text-[#5B50D6] text-xs font-bold hover:text-indigo-800 transition-colors flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> Editar
                   </button>
                 )}
               </div>
               
               {isEditingCBU ? (
-                <div className="mt-2 space-y-2">
+                <div className="space-y-3">
                   <input 
                     type="text" 
                     value={cbuValue} 
                     onChange={(e) => setCbuValue(e.target.value)} 
                     placeholder="Ingresa tu CBU o Alias"
-                    className="w-full border rounded p-2 text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono shadow-sm outline-none transition-colors"
                   />
                   <div className="flex gap-2">
-                    <button onClick={handleSaveCBU} disabled={isSavingCBU} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold disabled:opacity-50">
-                      {isSavingCBU ? 'Guardando...' : 'Guardar'}
+                    <button 
+                      onClick={handleSaveCBU} 
+                      disabled={isSavingCBU} 
+                      className="bg-[#5B50D6] text-white px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:bg-indigo-700 transition-colors"
+                    >
+                      {isSavingCBU ? 'Guardando...' : 'Guardar CBU'}
                     </button>
-                    <button onClick={() => { setIsEditingCBU(false); setCbuValue(profile.seller_profile?.cbu_alias || ''); }} className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold">
+                    <button 
+                      onClick={() => { setIsEditingCBU(false); setCbuValue(profile.seller_profile?.cbu_alias || ''); }} 
+                      className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors"
+                    >
                       Cancelar
                     </button>
                   </div>
                 </div>
               ) : (
-                <p className="text-lg font-semibold text-gray-800 mt-1">
-                  {profile.seller_profile?.cbu_alias || <span className="text-gray-400 italic text-sm">No configurado</span>}
+                <p className="text-base font-mono font-semibold text-slate-900">
+                  {profile.seller_profile?.cbu_alias || <span className="text-slate-400 italic text-sm font-sans">No configurado</span>}
                 </p>
               )}
             </div>
+
           </div>
         </div>
       </div>
 
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
-            <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50">
-              <h2 className="text-lg font-bold text-gray-800">Seguridad de la Cuenta</h2>
-              <button onClick={() => setIsPasswordModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#5B50D6] flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-slate-900">Seguridad de la Cuenta</h2>
+              </div>
+              <button 
+                onClick={() => setIsPasswordModalOpen(false)} 
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
             
-            <form onSubmit={handlePasswordSubmit} className="p-5 space-y-4">
+            <form onSubmit={handlePasswordSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Contraseña Actual *</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contraseña Actual *</label>
                 <input 
                   type="password" required 
-                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500" 
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors" 
                   value={passwordData.current}
                   onChange={e => setPasswordData({...passwordData, current: e.target.value})} 
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Nueva Contraseña *</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nueva Contraseña *</label>
                 <input 
                   type="password" required minLength={8}
-                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500" 
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors" 
                   value={passwordData.new}
                   onChange={e => setPasswordData({...passwordData, new: e.target.value})} 
+                  placeholder="Mínimo 8 caracteres"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Confirmar Nueva Contraseña *</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Confirmar Nueva Contraseña *</label>
                 <input 
                   type="password" required minLength={8}
-                  className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500" 
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors" 
                   value={passwordData.confirm}
                   onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} 
                 />
               </div>
-              <div className="flex justify-end gap-3 pt-4 border-t">
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
                 <button 
                   type="button" 
                   onClick={() => setIsPasswordModalOpen(false)} 
-                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
                   disabled={isSavingPassword} 
-                  className="px-4 py-2 text-sm font-bold text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-50"
+                  className="px-5 py-2.5 text-sm font-bold text-white bg-[#5B50D6] rounded-xl hover:bg-indigo-700 disabled:opacity-50 shadow-sm shadow-indigo-600/25 transition-all"
                 >
                   {isSavingPassword ? 'Actualizando...' : 'Actualizar Clave'}
                 </button>

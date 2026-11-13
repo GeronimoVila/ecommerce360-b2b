@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { X, Sliders } from 'lucide-react';
 import { PaymentRuleService, type PaymentRulePayload, type PaymentRule } from '../../../services/payment-rule.service';
 
 interface PaymentRuleModalProps {
@@ -104,64 +105,134 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-        <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50">
-          <h3 className="font-bold text-lg text-gray-800">
-            {ruleToEdit ? 'Editar Regla Financiera' : 'Nueva Regla Financiera'}
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm font-sans">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
+        
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#5B50D6] flex items-center justify-center">
+              <Sliders className="w-4 h-4" />
+            </div>
+            <h3 className="font-bold text-base text-slate-900">
+              {ruleToEdit ? 'Editar Regla Financiera' : 'Nueva Regla Financiera'}
+            </h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Método de Pago *</label>
-              <select name="payment_method" value={formData.payment_method} onChange={handleChange} disabled={!!ruleToEdit} required className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Método de Pago *</label>
+              <select 
+                name="payment_method" 
+                value={formData.payment_method} 
+                onChange={handleChange} 
+                disabled={!!ruleToEdit} 
+                required 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] disabled:bg-slate-100 disabled:text-slate-500 shadow-sm"
+              >
                 <option value="MP">Mercado Pago (MP)</option>
                 <option value="MOBBEX">Mobbex</option>
                 <option value="TRANSFERENCIA">Transferencia</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">Cuotas *</label>
-              <input type="number" name="installments" min="1" max="24" value={formData.installments} onChange={handleChange} disabled={!!ruleToEdit} required className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" />
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Cuotas *</label>
+              <input 
+                type="number" 
+                name="installments" 
+                min="1" 
+                max="24" 
+                value={formData.installments} 
+                onChange={handleChange} 
+                disabled={!!ruleToEdit} 
+                required 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] disabled:bg-slate-100 disabled:text-slate-500 shadow-sm font-mono" 
+              />
             </div>
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <label className="block text-xs font-bold text-blue-800 mb-1">Coeficiente Financiero *</label>
-            <p className="text-xs text-blue-600 mb-2">Ej: 1.0000 = Sin interés. 1.1500 = 15% de recargo.</p>
-            <input type="number" name="coefficient" step="0.0001" min="0.1000" max="3.0000" value={formData.coefficient} onChange={handleChange} required className="w-full border-blue-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 font-mono font-bold text-blue-900" />
+          <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/70">
+            <label className="block text-xs font-bold text-[#5B50D6] mb-1">Coeficiente Financiero *</label>
+            <p className="text-xs text-slate-500 mb-2.5">Ej: 1.0000 = Sin interés. 1.1500 = 15% de recargo.</p>
+            <input 
+              type="number" 
+              name="coefficient" 
+              step="0.0001" 
+              min="0.1000" 
+              max="3.0000" 
+              value={formData.coefficient} 
+              onChange={handleChange} 
+              required 
+              className="w-full border border-indigo-200 rounded-xl p-2.5 text-sm bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono font-bold text-slate-900 shadow-sm" 
+            />
           </div>
 
-          <div className="border-t border-gray-100 pt-4">
-            <label className="block text-xs font-bold text-gray-600 mb-2">Alcance de la Regla (Jerarquía) *</label>
-            <select value={targetType} onChange={handleTargetChange} disabled={!!ruleToEdit} className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 mb-3 disabled:bg-gray-100">
-              <option value="GLOBAL">Global (Aplica a todo el catálogo)</option>
-              <option value="CATEGORY">Específica de Categoría</option>
-              <option value="PRODUCT">Específica de Producto (SKU)</option>
-            </select>
+          <div className="border-t border-slate-100 pt-4 space-y-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Alcance de la Regla (Jerarquía) *</label>
+              <select 
+                value={targetType} 
+                onChange={handleTargetChange} 
+                disabled={!!ruleToEdit} 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] disabled:bg-slate-100 disabled:text-slate-500 shadow-sm"
+              >
+                <option value="GLOBAL">Global (Aplica a todo el catálogo)</option>
+                <option value="CATEGORY">Específica de Categoría</option>
+                <option value="PRODUCT">Específica de Producto (SKU)</option>
+              </select>
+            </div>
 
             {targetType === 'CATEGORY' && (
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">ID de Categoría *</label>
-                <input type="text" name="category_id" value={formData.category_id || ''} onChange={handleChange} disabled={!!ruleToEdit} required placeholder="UUID de la categoría" className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" />
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">ID de Categoría *</label>
+                <input 
+                  type="text" 
+                  name="category_id" 
+                  value={formData.category_id || ''} 
+                  onChange={handleChange} 
+                  disabled={!!ruleToEdit} 
+                  required 
+                  placeholder="UUID de la categoría" 
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] disabled:bg-slate-100 font-mono shadow-sm" 
+                />
               </div>
             )}
             
             {targetType === 'PRODUCT' && (
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">ID de Producto *</label>
-                <input type="text" name="product_id" value={formData.product_id || ''} onChange={handleChange} disabled={!!ruleToEdit} required placeholder="UUID del producto" className="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" />
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">ID de Producto *</label>
+                <input 
+                  type="text" 
+                  name="product_id" 
+                  value={formData.product_id || ''} 
+                  onChange={handleChange} 
+                  disabled={!!ruleToEdit} 
+                  required 
+                  placeholder="UUID del producto" 
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] disabled:bg-slate-100 font-mono shadow-sm" 
+                />
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-            <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-sm">
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              disabled={isSubmitting} 
+              className="px-5 py-2.5 text-sm font-bold text-white bg-[#5B50D6] rounded-xl hover:bg-indigo-700 disabled:opacity-50 shadow-sm shadow-indigo-600/25 transition-all"
+            >
               {isSubmitting ? 'Guardando...' : (ruleToEdit ? 'Actualizar Coeficiente' : 'Crear Regla')}
             </button>
           </div>

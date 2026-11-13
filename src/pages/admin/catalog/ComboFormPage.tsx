@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Layers, Plus, Trash2, Box } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
 import type { Product } from '../../../types/product';
 
@@ -119,104 +120,109 @@ export const ComboFormPage = () => {
 
   if (isLoadingInitialData) {
       return (
-          <div className="p-12 flex justify-center items-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
+          <div className="p-12 flex justify-center items-center min-h-[60vh]">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#5B50D6]"></div>
           </div>
       );
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto">
-      <div className="mb-6">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
+      
+      <div>
         <button 
           type="button" 
           onClick={() => navigate('/admin/catalog')}
-          className="flex items-center text-sm font-medium text-gray-500 hover:text-blue-600 transition-colors mb-4"
+          className="flex items-center text-sm font-semibold text-slate-500 hover:text-[#5B50D6] transition-colors mb-4 group"
         >
-          <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
+          <ArrowLeft className="w-4 h-4 mr-1.5 transition-transform group-hover:-translate-x-1" />
           Volver al catálogo
         </button>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
             {isEditMode ? 'Editar Combo' : 'Armador de Combos'}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">El stock se calculará automáticamente vía Redis basado en los componentes.</p>
+        <p className="text-sm text-slate-500 mt-1">El stock virtual se calculará automáticamente vía Redis basado en los componentes seleccionados.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        <div className="bg-white p-5 md:p-8 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Información del Paquete</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+          <h2 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#5B50D6]" /> Información del Paquete
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">SKU del Combo *</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">SKU del Combo *</label>
               <input 
                 type="text" name="sku" value={formData.sku} onChange={handleChange} required
                 disabled={isEditMode}
-                className="mt-1 block w-full border border-gray-300 rounded-lg p-3 sm:p-2 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 transition-colors"
+                className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
                 placeholder="Ej. COMBO-VERANO-24"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Nombre Comercial *</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre Comercial *</label>
               <input 
                 type="text" name="name" value={formData.name} onChange={handleChange} required
-                className="mt-1 block w-full border border-gray-300 rounded-lg p-3 sm:p-2 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 transition-colors"
+                placeholder="Ej. Kit Residencial Inverter"
+                className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm"
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-5 md:p-8 rounded-xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4 border-b pb-2">
-            <h2 className="text-lg font-bold text-gray-800">Componentes (Partes)</h2>
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Box className="w-5 h-5 text-[#5B50D6]" /> Componentes (Partes)
+            </h2>
             <button 
               type="button" onClick={addPart}
-              className="bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors"
+              className="bg-[#1A1D27] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-sm"
             >
-              + Añadir Producto
+              <Plus className="w-4 h-4" /> Añadir Producto
             </button>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {parts.length === 0 ? (
-              <div className="text-center p-6 border-2 border-dashed border-gray-200 rounded-lg text-gray-500 text-sm">
-                No has añadido productos a este combo.
+              <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm bg-slate-50/50">
+                No has añadido productos componentes a este combo.
               </div>
             ) : (
               parts.map((part, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end p-4 bg-slate-50 border border-slate-200 rounded-xl">
                   <div className="w-full sm:flex-1">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Producto</label>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Producto</label>
                     <select 
                       value={part.sku}
                       onChange={(e) => updatePart(index, 'sku', e.target.value)}
                       required
-                      className="block w-full border border-gray-300 rounded-lg p-3 sm:p-2 text-base sm:text-sm bg-white"
+                      className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm cursor-pointer"
                     >
-                      <option value="" disabled>Selecciona un producto...</option>
+                      <option value="" disabled>Selecciona un producto físico...</option>
                       {availableProducts.map(p => (
                         <option key={p.id} value={p.sku}>
-                          {p.name} (${Number(p.base_price).toFixed(2)})
+                          {p.name} (${Number(p.base_price).toFixed(2)}) - SKU: {p.sku}
                         </option>
                       ))}
                     </select>
                   </div>
-                  <div className="w-full sm:w-24">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Cantidad</label>
+                  <div className="w-full sm:w-28">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Cantidad</label>
                     <input 
                       type="number" min="1" required
                       value={part.quantity}
                       onChange={(e) => updatePart(index, 'quantity', Number(e.target.value))}
-                      className="block w-full border border-gray-300 rounded-lg p-3 sm:p-2 text-base sm:text-sm"
+                      className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 font-mono shadow-sm"
                     />
                   </div>
                   <button 
                     type="button" onClick={() => removePart(index)}
-                    className="w-full sm:w-auto mt-2 sm:mt-0 px-3 py-3 sm:py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium text-sm transition-colors"
+                    className="w-full sm:w-auto mt-2 sm:mt-0 p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+                    title="Eliminar componente"
                   >
-                    Eliminar
+                    <Trash2 className="w-4 h-4" /> <span className="sm:hidden">Eliminar</span>
                   </button>
                 </div>
               ))
@@ -224,38 +230,38 @@ export const ComboFormPage = () => {
           </div>
         </div>
 
-        <div className="bg-white p-5 md:p-8 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Precios y Comisiones</h2>
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+          <h2 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">Precios y Comisiones</h2>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Precio Final del Combo ($) *</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Precio Final del Combo ($) *</label>
               <input 
                 type="number" name="base_price" step="0.01" min="0" required
                 value={formData.base_price} onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-lg p-3 sm:p-2 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Comisión Vendedor (%) *</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Comisión Vendedor (%) *</label>
               <input 
                 type="number" name="commission_rate" step="0.1" min="0" required
                 value={formData.commission_rate} onChange={handleChange}
-                className="mt-1 block w-full border border-gray-300 rounded-lg p-3 sm:p-2 text-base sm:text-sm focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
             <div>
-              <p className="text-sm text-slate-600 font-medium">Suma del costo individual de productos:</p>
-              <p className="text-xl font-bold text-slate-800">${originalTotalValue.toFixed(2)}</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suma del costo individual de componentes:</p>
+              <p className="text-xl font-extrabold text-slate-900 font-mono mt-0.5">${originalTotalValue.toFixed(2)}</p>
             </div>
             {Number(formData.base_price) > 0 && (
-              <div className={`px-4 py-2 rounded-lg text-sm font-bold ${
+              <div className={`px-4 py-2 rounded-xl text-xs font-bold ${
                 Number(formData.base_price) < originalTotalValue 
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-green-100 text-green-800'
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
               }`}>
                 Margen Bruto: ${(Number(formData.base_price) - originalTotalValue).toFixed(2)}
               </div>
@@ -263,17 +269,17 @@ export const ComboFormPage = () => {
           </div>
         </div>
 
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 md:gap-4 pb-10">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pb-10">
           <button 
             type="button" onClick={() => navigate('/admin/catalog')}
-            className="w-full sm:w-auto px-6 py-3 sm:py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+            className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 text-sm transition-colors"
           >
             Cancelar
           </button>
           <button 
             type="submit" disabled={isSubmitting}
-            className={`w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-lg text-white font-bold transition-all shadow-sm ${
-              isSubmitting ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md'
+            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm text-sm ${
+              isSubmitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-[#5B50D6] hover:bg-indigo-700 shadow-indigo-600/25'
             }`}
           >
             {isSubmitting ? 'Guardando...' : (isEditMode ? 'Actualizar Combo' : 'Crear Combo')}

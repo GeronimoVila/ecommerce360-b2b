@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X, PackagePlus } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
 import type { Product } from '../../../types/product';
 
@@ -52,48 +53,117 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-        <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-gray-50">
-          <h3 className="font-bold text-lg text-gray-800">Alta Rápida de Producto</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-            ✕
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm font-sans">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
+        
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#5B50D6] flex items-center justify-center">
+              <PackagePlus className="w-4 h-4" />
+            </div>
+            <h3 className="font-bold text-base text-slate-900">Alta Rápida de Producto</h3>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <p className="text-xs text-gray-500 mb-4">El stock inicial será 0. La cantidad recibida se sumará al confirmar el remito.</p>
-          
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-bold text-gray-600 mb-1">SKU *</label>
-              <input type="text" name="sku" required value={formData.sku} onChange={handleChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="Ej. TAZA-B-01" />
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">SKU *</label>
+              <input 
+                type="text" 
+                name="sku" 
+                required 
+                value={formData.sku} 
+                onChange={handleChange} 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm font-mono" 
+                placeholder="Ej. TAZA-B-01" 
+              />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-bold text-gray-600 mb-1">Nombre *</label>
-              <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="Taza Blanca" />
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nombre *</label>
+              <input 
+                type="text" 
+                name="name" 
+                required 
+                value={formData.name} 
+                onChange={handleChange} 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm" 
+                placeholder="Taza Blanca" 
+              />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-bold text-gray-600 mb-1">Costo Compra ($) *</label>
-              <input type="number" name="purchase_cost" min="0" step="0.01" required value={formData.purchase_cost} onChange={handleChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Costo Compra ($) *</label>
+              <input 
+                type="number" 
+                name="purchase_cost" 
+                min="0" 
+                step="0.01" 
+                required 
+                value={formData.purchase_cost} 
+                onChange={handleChange} 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm font-mono" 
+              />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-bold text-gray-600 mb-1">IVA (%) *</label>
-              <input type="number" name="vat_rate" min="0" step="0.1" required value={formData.vat_rate} onChange={handleChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">IVA (%) *</label>
+              <input 
+                type="number" 
+                name="vat_rate" 
+                min="0" 
+                step="0.1" 
+                required 
+                value={formData.vat_rate} 
+                onChange={handleChange} 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm font-mono" 
+              />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-bold text-gray-600 mb-1">Margen Ganancia (%) *</label>
-              <input type="number" name="profit_margin" min="0" step="0.1" required value={formData.profit_margin} onChange={handleChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Margen Ganancia (%) *</label>
+              <input 
+                type="number" 
+                name="profit_margin" 
+                min="0" 
+                step="0.1" 
+                required 
+                value={formData.profit_margin} 
+                onChange={handleChange} 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm font-mono" 
+              />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-bold text-gray-600 mb-1">Comisión Vendedor (%) *</label>
-              <input type="number" name="commission_rate" min="0" step="0.1" required value={formData.commission_rate} onChange={handleChange} className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Comisión Vendedor (%) *</label>
+              <input 
+                type="number" 
+                name="commission_rate" 
+                min="0" 
+                step="0.1" 
+                required 
+                value={formData.commission_rate} 
+                onChange={handleChange} 
+                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm font-mono" 
+              />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Cancelar</button>
-            <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              disabled={isSubmitting} 
+              className="px-5 py-2.5 text-sm font-bold text-white bg-[#5B50D6] rounded-xl hover:bg-indigo-700 disabled:opacity-50 shadow-sm shadow-indigo-600/25 transition-all"
+            >
               {isSubmitting ? 'Guardando...' : 'Crear Producto'}
             </button>
           </div>
