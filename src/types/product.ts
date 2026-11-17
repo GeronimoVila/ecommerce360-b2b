@@ -1,5 +1,5 @@
 export interface Product {
-  is_combo: any;
+  is_combo: boolean;
   id: string;
   sku: string;
   name: string;
@@ -11,9 +11,16 @@ export interface Product {
   commission_rate: number;
   physical_stock: number;
   is_active: boolean;
+  category_id: string;
+  category?: {
+    id: string;
+    name: string;
+    slug: string;
+    path?: string;
+  };
   created_at?: string;
   updated_at?: string;
-  
+
   combo_parts?: {
     quantity: number;
     product: {
@@ -21,13 +28,14 @@ export interface Product {
       name: string;
       purchase_cost?: number;
       physical_stock?: number;
-    }
+    };
   }[];
 }
 
 export interface ProductFormData {
   sku: string;
   name: string;
+  category_id: string;
   purchase_cost: number;
   vat_rate: number;
   profit_margin: number;

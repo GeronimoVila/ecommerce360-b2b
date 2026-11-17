@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Percent, BarChart3 } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
+import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 
 export const ProductFormPage = () => {
   const { id } = useParams();
@@ -11,6 +12,7 @@ export const ProductFormPage = () => {
   const [formData, setFormData] = useState<any>({
     sku: '',
     name: '',
+    category_id: '',
     purchase_cost: 0,
     vat_rate: 21,
     profit_margin: 0,
@@ -18,22 +20,26 @@ export const ProductFormPage = () => {
     commission_rate: 0,
   });
 
+  const [isCategoryLeaf, setIsCategoryLeaf] = useState(false);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isEditMode && id) {
-      ProductService.getById(id).then(product => {
-        setFormData({
-          sku: product.sku || '',
-          name: product.name || '',
-          purchase_cost: Number(product.purchase_cost) || 0,
-          vat_rate: Number(product.vat_rate) || 0,
-          profit_margin: Number(product.profit_margin) || 0,
-          physical_stock: Number(product.physical_stock) || 0,
-          commission_rate: Number(product.commission_rate) || 0,
-        });
-      }).catch(err => console.error("Error hidratando datos:", err));
+      ProductService.getById(id)
+        .then((product) => {
+          setFormData({
+            sku: product.sku || '',
+            name: product.name || '',
+            category_id: product.category_id || product.category?.id || '',
+            purchase_cost: Number(product.purchase_cost) || 0,
+            vat_rate: Number(product.vat_rate) || 0,
+            profit_margin: Number(product.profit_margin) || 0,
+            physical_stock: Number(product.physical_stock) || 0,
+            commission_rate: Number(product.commission_rate) || 0,
+          });
+        })
+        .catch((err) => console.error('Error hidratando datos:', err));
     }
   }, [id, isEditMode]);
 
@@ -41,30 +47,34 @@ export const ProductFormPage = () => {
     const cost = Number(formData.purchase_cost) || 0;
     const vat = Number(formData.vat_rate) || 0;
     const margin = Number(formData.profit_margin) || 0;
-    
-    const costWithVat = cost * (1 + (vat / 100));
-    const finalPrice = costWithVat * (1 + (margin / 100));
+
+    const costWithVat = cost * (1 + vat / 100);
+    const finalPrice = costWithVat * (1 + margin / 100);
     setCalculatedPrice(finalPrice);
   }, [formData.purchase_cost, formData.vat_rate, formData.profit_margin]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    setFormData((prev: any) => ({ 
-      ...prev, 
-      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value 
+    setFormData((prev: any) => ({
+      ...prev,
+      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value,
     }));
   };
 
   const validatePayload = (): boolean => {
     if (!formData.sku || formData.sku.trim() === '') {
-      alert("El SKU es obligatorio.");
+      alert('El SKU es obligatorio.');
       return false;
     }
     if (!formData.name || formData.name.trim() === '') {
-      alert("El nombre del producto es obligatorio.");
+      alert('El nombre del producto es obligatorio.');
       return false;
     }
-    
+    if (!formData.category_id || !isCategoryLeaf) {
+      alert('Debes seleccionar una subcategoría final (hoja) válida.');
+      return false;
+    }
+
     const numericFields = ['purchase_cost', 'vat_rate', 'profit_margin', 'commission_rate', 'physical_stock'];
     for (const field of numericFields) {
       if (formData[field] === '' || formData[field] === null || formData[field] === undefined) {
@@ -82,12 +92,13 @@ export const ProductFormPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validatePayload()) return;
-    
+
     setIsSubmitting(true);
 
     const sanitizedPayload = {
       sku: formData.sku,
       name: formData.name,
+      category_id: formData.category_id,
       purchase_cost: Number(formData.purchase_cost),
       vat_rate: Number(formData.vat_rate),
       profit_margin: Number(formData.profit_margin),
@@ -112,10 +123,9 @@ export const ProductFormPage = () => {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
-      
       <div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={() => navigate('/admin/catalog')}
           className="flex items-center text-sm font-semibold text-slate-500 hover:text-[#5B50D6] transition-colors mb-4 group"
         >
@@ -125,61 +135,111 @@ export const ProductFormPage = () => {
         <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
           {isEditMode ? 'Editar Producto Físico' : 'Crear Nuevo Producto'}
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Completa los parámetros de costos, impuestos y márgenes comerciales.</p>
+        <p className="text-sm text-slate-500 mt-1">
+          Completa los parámetros de costos, impuestos, categoría y márgenes comerciales.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-        
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">SKU (Código Único) *</label>
-            <input 
-              type="text" name="sku" value={formData.sku} onChange={handleChange} required
-              disabled={isEditMode} 
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              SKU (Código Único) *
+            </label>
+            <input
+              type="text"
+              name="sku"
+              value={formData.sku}
+              onChange={handleChange}
+              required
+              disabled={isEditMode}
               placeholder="Ej. PROD-REF-001"
               className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 disabled:text-slate-500 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre del Producto *</label>
-            <input 
-              type="text" name="name" value={formData.name} onChange={handleChange} required
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              Nombre del Producto *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
               placeholder="Ej. Heladera No Frost Inverter"
               className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm"
             />
           </div>
         </div>
 
+        <div className="border-t border-slate-100 pt-5">
+          <CategoryCascader
+            selectedCategoryId={formData.category_id}
+            onChange={(catId, isLeaf) => {
+              setFormData((prev: any) => ({ ...prev, category_id: catId }));
+              setIsCategoryLeaf(isLeaf);
+            }}
+          />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-slate-100 pt-6">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Costo Compra ($) *</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              Costo Compra ($) *
+            </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><DollarSign className="w-4 h-4" /></span>
-              <input 
-                type="number" name="purchase_cost" step="0.01" min="0"
-                value={formData.purchase_cost} onChange={handleChange} required
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <DollarSign className="w-4 h-4" />
+              </span>
+              <input
+                type="number"
+                name="purchase_cost"
+                step="0.01"
+                min="0"
+                value={formData.purchase_cost}
+                onChange={handleChange}
+                required
                 className="mt-1 block w-full pl-9 pr-3 border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">IVA (%) *</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              IVA (%) *
+            </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><Percent className="w-4 h-4" /></span>
-              <input 
-                type="number" name="vat_rate" step="0.1" min="0"
-                value={formData.vat_rate} onChange={handleChange} required
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <Percent className="w-4 h-4" />
+              </span>
+              <input
+                type="number"
+                name="vat_rate"
+                step="0.1"
+                min="0"
+                value={formData.vat_rate}
+                onChange={handleChange}
+                required
                 className="mt-1 block w-full pl-9 pr-3 border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Margen Ganancia (%) *</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              Margen Ganancia (%) *
+            </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><BarChart3 className="w-4 h-4" /></span>
-              <input 
-                type="number" name="profit_margin" step="0.1" min="0"
-                value={formData.profit_margin} onChange={handleChange} required
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <BarChart3 className="w-4 h-4" />
+              </span>
+              <input
+                type="number"
+                name="profit_margin"
+                step="0.1"
+                min="0"
+                value={formData.profit_margin}
+                onChange={handleChange}
+                required
                 className="mt-1 block w-full pl-9 pr-3 border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
@@ -189,7 +249,9 @@ export const ProductFormPage = () => {
         <div className="bg-[#5B50D6]/5 border border-[#5B50D6]/20 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center">
           <div>
             <p className="text-sm text-[#5B50D6] font-bold">Precio Base Calculado</p>
-            <p className="text-xs text-slate-500 mt-0.5">Precio final proyectado aplicando IVA y margen comercial</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Precio final proyectado aplicando IVA y margen comercial
+            </p>
           </div>
           <p className="text-2xl md:text-3xl font-extrabold text-[#5B50D6] mt-2 sm:mt-0 font-mono">
             ${calculatedPrice.toFixed(2)}
@@ -198,18 +260,31 @@ export const ProductFormPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-slate-100 pt-6">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Comisión Vendedor (%) *</label>
-            <input 
-              type="number" name="commission_rate" step="0.1" min="0"
-              value={formData.commission_rate} onChange={handleChange} required
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              Comisión Vendedor (%) *
+            </label>
+            <input
+              type="number"
+              name="commission_rate"
+              step="0.1"
+              min="0"
+              value={formData.commission_rate}
+              onChange={handleChange}
+              required
               className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Stock Físico</label>
-            <input 
-              type="number" name="physical_stock" min="0"
-              value={formData.physical_stock} onChange={handleChange} required
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+              Stock Físico
+            </label>
+            <input
+              type="number"
+              name="physical_stock"
+              min="0"
+              value={formData.physical_stock}
+              onChange={handleChange}
+              required
               disabled={isEditMode}
               className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 disabled:text-slate-500 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
             />
@@ -217,19 +292,19 @@ export const ProductFormPage = () => {
         </div>
 
         <div className="pt-6 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => navigate('/admin/catalog')}
             className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm"
           >
             Cancelar
           </button>
-          <button 
-            type="submit" 
-            disabled={isSubmitting}
+          <button
+            type="submit"
+            disabled={isSubmitting || !isCategoryLeaf}
             className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm text-sm ${
-              isSubmitting 
-                ? 'bg-indigo-400 cursor-not-allowed' 
+              isSubmitting || !isCategoryLeaf
+                ? 'bg-indigo-300 cursor-not-allowed'
                 : 'bg-[#5B50D6] hover:bg-indigo-700 shadow-indigo-600/25'
             }`}
           >

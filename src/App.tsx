@@ -16,6 +16,7 @@ const RestockFormPage = lazy(() => import('./pages/admin/inventory/RestockFormPa
 const FinancialRulesPage = lazy(() => import('./pages/admin/financial/FinancialRulesPage').then(module => ({ default: module.FinancialRulesPage })));
 const SellersManagementPage = lazy(() => import('./pages/admin/team/SellersManagementPage').then(module => ({ default: module.SellersManagementPage })));
 const CommissionsPage = lazy(() => import('./components/admin/financial/CommissionsPage').then(module => ({ default: module.CommissionsPage })));
+const CategoriesPage = lazy(() => import('./pages/admin/catalog/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -62,6 +63,7 @@ function App() {
               <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
               <Route path="/admin/team" element={<SellersManagementPage />} />
               <Route path="/admin/commissions" element={<CommissionsPage />} />
+              <Route path="/admin/categories" element={<CategoriesPage />} />
             </Route>
           </Route>
 

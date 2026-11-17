@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Layers, Plus, Trash2, Box } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
+import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 import type { Product } from '../../../types/product';
 
 export const ComboFormPage = () => {
@@ -12,10 +13,12 @@ export const ComboFormPage = () => {
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
+    category_id: '',
     base_price: 0,
     commission_rate: 0,
   });
 
+  const [isCategoryLeaf, setIsCategoryLeaf] = useState(false);
   const [parts, setParts] = useState<{ sku: string; quantity: number }[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,30 +28,31 @@ export const ComboFormPage = () => {
     const initForm = async () => {
       try {
         const data = await ProductService.getAdminCatalog('simple');
-        const baseProducts = data.filter(p => !p.is_combo && p.is_active);
+        const baseProducts = data.filter((p) => !p.is_combo && p.is_active);
         setAvailableProducts(baseProducts);
 
         if (isEditMode && id) {
           const comboData = await ProductService.getById(id);
-          
+
           setFormData({
             sku: comboData.sku || '',
             name: comboData.name || '',
+            category_id: comboData.category_id || comboData.category?.id || '',
             base_price: Number(comboData.base_price) || 0,
             commission_rate: Number(comboData.commission_rate) || 0,
           });
 
           if (comboData.combo_parts) {
-             const mappedParts = comboData.combo_parts.map((cp: any) => ({
-                 sku: cp.product.sku,
-                 quantity: cp.quantity
-             }));
-             setParts(mappedParts);
+            const mappedParts = comboData.combo_parts.map((cp: any) => ({
+              sku: cp.product.sku,
+              quantity: cp.quantity,
+            }));
+            setParts(mappedParts);
           }
         }
       } catch (error) {
-        console.error("Error inicializando combo:", error);
-        alert("No se pudo cargar la información del combo.");
+        console.error('Error inicializando combo:', error);
+        alert('No se pudo cargar la información del combo.');
         navigate('/admin/catalog');
       } finally {
         setIsLoadingInitialData(false);
@@ -59,15 +63,15 @@ export const ComboFormPage = () => {
   }, [id, isEditMode, navigate]);
 
   const originalTotalValue = parts.reduce((acc, part) => {
-    const product = availableProducts.find(p => p.sku === part.sku);
-    return acc + (Number(product?.purchase_cost || product?.base_price || 0) * part.quantity);
+    const product = availableProducts.find((p) => p.sku === part.sku);
+    return acc + Number(product?.purchase_cost || product?.base_price || 0) * part.quantity;
   }, 0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value 
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value,
     }));
   };
 
@@ -83,13 +87,17 @@ export const ComboFormPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (parts.length === 0) {
-      alert("El combo debe tener al menos 1 producto componente.");
+
+    if (!formData.category_id || !isCategoryLeaf) {
+      alert('Debes seleccionar una subcategoría final (hoja) válida para el combo.');
       return;
     }
-    if (parts.some(p => p.sku === '' || p.quantity <= 0)) {
-      alert("Verifica que todos los componentes tengan un producto seleccionado y cantidad mayor a 0.");
+    if (parts.length === 0) {
+      alert('El combo debe tener al menos 1 producto componente.');
+      return;
+    }
+    if (parts.some((p) => p.sku === '' || p.quantity <= 0)) {
+      alert('Verifica que todos los componentes tengan un producto seleccionado y cantidad mayor a 0.');
       return;
     }
 
@@ -98,16 +106,17 @@ export const ComboFormPage = () => {
     const payload = {
       sku: formData.sku,
       name: formData.name,
+      category_id: formData.category_id,
       base_price: Number(formData.base_price),
       commission_rate: Number(formData.commission_rate),
-      parts: parts.map(p => ({ sku: p.sku, quantity: Number(p.quantity) }))
+      parts: parts.map((p) => ({ sku: p.sku, quantity: Number(p.quantity) })),
     };
 
     try {
       if (isEditMode && id) {
-          await ProductService.updateCombo(id, payload);
+        await ProductService.updateCombo(id, payload);
       } else {
-          await ProductService.createCombo(payload);
+        await ProductService.createCombo(payload);
       }
       navigate('/admin/catalog');
     } catch (error: any) {
@@ -119,19 +128,18 @@ export const ComboFormPage = () => {
   };
 
   if (isLoadingInitialData) {
-      return (
-          <div className="p-12 flex justify-center items-center min-h-[60vh]">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#5B50D6]"></div>
-          </div>
-      );
+    return (
+      <div className="p-12 flex justify-center items-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#5B50D6]"></div>
+      </div>
+    );
   }
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
-      
       <div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={() => navigate('/admin/catalog')}
           className="flex items-center text-sm font-semibold text-slate-500 hover:text-[#5B50D6] transition-colors mb-4 group"
         >
@@ -139,35 +147,58 @@ export const ComboFormPage = () => {
           Volver al catálogo
         </button>
         <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
-            {isEditMode ? 'Editar Combo' : 'Armador de Combos'}
+          {isEditMode ? 'Editar Combo' : 'Armador de Combos'}
         </h1>
-        <p className="text-sm text-slate-500 mt-1">El stock virtual se calculará automáticamente vía Redis basado en los componentes seleccionados.</p>
+        <p className="text-sm text-slate-500 mt-1">
+          El stock virtual se calculará automáticamente vía Redis basado en los componentes seleccionados.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        
-        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+          <h2 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100 flex items-center gap-2">
             <Layers className="w-5 h-5 text-[#5B50D6]" /> Información del Paquete
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">SKU del Combo *</label>
-              <input 
-                type="text" name="sku" value={formData.sku} onChange={handleChange} required
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                SKU del Combo *
+              </label>
+              <input
+                type="text"
+                name="sku"
+                value={formData.sku}
+                onChange={handleChange}
+                required
                 disabled={isEditMode}
                 className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
                 placeholder="Ej. COMBO-VERANO-24"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre Comercial *</label>
-              <input 
-                type="text" name="name" value={formData.name} onChange={handleChange} required
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Nombre Comercial *
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
                 placeholder="Ej. Kit Residencial Inverter"
                 className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm"
               />
             </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-5">
+            <CategoryCascader
+              selectedCategoryId={formData.category_id}
+              onChange={(catId, isLeaf) => {
+                setFormData((prev) => ({ ...prev, category_id: catId }));
+                setIsCategoryLeaf(isLeaf);
+              }}
+            />
           </div>
         </div>
 
@@ -176,8 +207,9 @@ export const ComboFormPage = () => {
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Box className="w-5 h-5 text-[#5B50D6]" /> Componentes (Partes)
             </h2>
-            <button 
-              type="button" onClick={addPart}
+            <button
+              type="button"
+              onClick={addPart}
               className="bg-[#1A1D27] text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-sm"
             >
               <Plus className="w-4 h-4" /> Añadir Producto
@@ -191,17 +223,24 @@ export const ComboFormPage = () => {
               </div>
             ) : (
               parts.map((part, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div
+                  key={index}
+                  className="flex flex-col sm:flex-row gap-3 items-start sm:items-end p-4 bg-slate-50 border border-slate-200 rounded-xl"
+                >
                   <div className="w-full sm:flex-1">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Producto</label>
-                    <select 
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                      Producto
+                    </label>
+                    <select
                       value={part.sku}
                       onChange={(e) => updatePart(index, 'sku', e.target.value)}
                       required
                       className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm cursor-pointer"
                     >
-                      <option value="" disabled>Selecciona un producto físico...</option>
-                      {availableProducts.map(p => (
+                      <option value="" disabled>
+                        Selecciona un producto físico...
+                      </option>
+                      {availableProducts.map((p) => (
                         <option key={p.id} value={p.sku}>
                           {p.name} (${Number(p.base_price).toFixed(2)}) - SKU: {p.sku}
                         </option>
@@ -209,16 +248,21 @@ export const ComboFormPage = () => {
                     </select>
                   </div>
                   <div className="w-full sm:w-28">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Cantidad</label>
-                    <input 
-                      type="number" min="1" required
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                      Cantidad
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
                       value={part.quantity}
                       onChange={(e) => updatePart(index, 'quantity', Number(e.target.value))}
                       className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 font-mono shadow-sm"
                     />
                   </div>
-                  <button 
-                    type="button" onClick={() => removePart(index)}
+                  <button
+                    type="button"
+                    onClick={() => removePart(index)}
                     className="w-full sm:w-auto mt-2 sm:mt-0 p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
                     title="Eliminar componente"
                   >
@@ -231,22 +275,38 @@ export const ComboFormPage = () => {
         </div>
 
         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">Precios y Comisiones</h2>
-          
+          <h2 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
+            Precios y Comisiones
+          </h2>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Precio Final del Combo ($) *</label>
-              <input 
-                type="number" name="base_price" step="0.01" min="0" required
-                value={formData.base_price} onChange={handleChange}
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Precio Final del Combo ($) *
+              </label>
+              <input
+                type="number"
+                name="base_price"
+                step="0.01"
+                min="0"
+                required
+                value={formData.base_price}
+                onChange={handleChange}
                 className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Comisión Vendedor (%) *</label>
-              <input 
-                type="number" name="commission_rate" step="0.1" min="0" required
-                value={formData.commission_rate} onChange={handleChange}
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Comisión Vendedor (%) *
+              </label>
+              <input
+                type="number"
+                name="commission_rate"
+                step="0.1"
+                min="0"
+                required
+                value={formData.commission_rate}
+                onChange={handleChange}
                 className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
@@ -254,15 +314,21 @@ export const ComboFormPage = () => {
 
           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Suma del costo individual de componentes:</p>
-              <p className="text-xl font-extrabold text-slate-900 font-mono mt-0.5">${originalTotalValue.toFixed(2)}</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Suma del costo individual de componentes:
+              </p>
+              <p className="text-xl font-extrabold text-slate-900 font-mono mt-0.5">
+                ${originalTotalValue.toFixed(2)}
+              </p>
             </div>
             {Number(formData.base_price) > 0 && (
-              <div className={`px-4 py-2 rounded-xl text-xs font-bold ${
-                Number(formData.base_price) < originalTotalValue 
-                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              }`}>
+              <div
+                className={`px-4 py-2 rounded-xl text-xs font-bold ${
+                  Number(formData.base_price) < originalTotalValue
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}
+              >
                 Margen Bruto: ${(Number(formData.base_price) - originalTotalValue).toFixed(2)}
               </div>
             )}
@@ -270,19 +336,23 @@ export const ComboFormPage = () => {
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pb-10">
-          <button 
-            type="button" onClick={() => navigate('/admin/catalog')}
+          <button
+            type="button"
+            onClick={() => navigate('/admin/catalog')}
             className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 text-sm transition-colors"
           >
             Cancelar
           </button>
-          <button 
-            type="submit" disabled={isSubmitting}
+          <button
+            type="submit"
+            disabled={isSubmitting || !isCategoryLeaf}
             className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm text-sm ${
-              isSubmitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-[#5B50D6] hover:bg-indigo-700 shadow-indigo-600/25'
+              isSubmitting || !isCategoryLeaf
+                ? 'bg-indigo-300 cursor-not-allowed'
+                : 'bg-[#5B50D6] hover:bg-indigo-700 shadow-indigo-600/25'
             }`}
           >
-            {isSubmitting ? 'Guardando...' : (isEditMode ? 'Actualizar Combo' : 'Crear Combo')}
+            {isSubmitting ? 'Guardando...' : isEditMode ? 'Actualizar Combo' : 'Crear Combo'}
           </button>
         </div>
       </form>

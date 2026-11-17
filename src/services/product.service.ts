@@ -4,10 +4,13 @@ import type { Product, ProductFormData } from '../types/product';
 const BASE_PATH = 'products';
 
 export const ProductService = {
-  getAdminCatalog: async (type?: 'simple' | 'combo'): Promise<Product[]> => {
-    const query = type ? `?type=${type}` : '';
+  getAdminCatalog: async (type?: 'simple' | 'combo', categorySlug?: string): Promise<Product[]> => {
+    const params = new URLSearchParams();
+    if (type) params.append('type', type);
+    if (categorySlug) params.append('category_slug', categorySlug);
+    const query = params.toString() ? `?${params.toString()}` : '';
     const response = await apiClient.get(`${BASE_PATH}/admin${query}`);
-    return response.data.data; 
+    return response.data.data;
   },
   
   getPosCatalog: async (type?: 'simple' | 'combo'): Promise<Product[]> => {
@@ -29,9 +32,10 @@ export const ProductService = {
   createCombo: async (data: {
     sku: string;
     name: string;
+    category_id: string;
     base_price: number;
     commission_rate: number;
-    parts: { sku: string; quantity: number }[]
+    parts: { sku: string; quantity: number }[];
   }): Promise<Product> => {
     const response = await apiClient.post(`${BASE_PATH}/combos`, data);
     return response.data.combo;
@@ -40,9 +44,10 @@ export const ProductService = {
   updateCombo: async (id: string, data: {
     sku: string;
     name: string;
+    category_id: string;
     base_price: number;
     commission_rate: number;
-    parts: { sku: string; quantity: number }[]
+    parts: { sku: string; quantity: number }[];
   }): Promise<Product> => {
     const response = await apiClient.patch(`${BASE_PATH}/combos/${id}`, data);
     return response.data.combo;
