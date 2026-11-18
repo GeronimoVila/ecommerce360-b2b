@@ -12,6 +12,12 @@ type DomainType = 'simple' | 'combo';
 type FilterState = 'ALL' | 'ACTIVE' | 'INACTIVE';
 type StockFilterState = 'ALL' | 'IN_STOCK' | 'LOW_STOCK';
 
+const getPrimaryImageUrl = (product: Product): string | null => {
+  if (!product.images || product.images.length === 0) return null;
+  const primary = product.images.find((img) => img.is_primary) || product.images[0];
+  return primary?.url || null;
+};
+
 export const CatalogPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -261,64 +267,78 @@ export const CatalogPage = () => {
       ) : (
         <>
           <div className="md:hidden space-y-4">
-            {filteredProducts.map((p: Product) => (
-              <div key={p.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex gap-3">
-                    <div className="w-12 h-12 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
-                      <Box className="w-6 h-6 text-slate-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-sm leading-tight">{p.name}</h3>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                        <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                          SKU: {p.sku}
-                        </span>
-                        <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
-                          {p.category?.name || 'Sin categoría'}
-                        </span>
+            {filteredProducts.map((p: Product) => {
+              const thumbUrl = getPrimaryImageUrl(p);
+              return (
+                <div key={p.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex gap-3">
+                      <div className="w-12 h-12 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                        {thumbUrl ? (
+                          <img
+                            src={thumbUrl}
+                            alt={p.name}
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : p.is_combo ? (
+                          <Layers className="w-5 h-5 text-slate-400" />
+                        ) : (
+                          <Box className="w-6 h-6 text-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm leading-tight">{p.name}</h3>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                            SKU: {p.sku}
+                          </span>
+                          <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                            {p.category?.name || 'Sin categoría'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <div>
-                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Precio Venta</p>
-                    <p className="font-extrabold text-slate-900">${Number(p.base_price).toLocaleString('es-AR')}</p>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div>
+                      <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Precio Venta</p>
+                      <p className="font-extrabold text-slate-900">${Number(p.base_price).toLocaleString('es-AR')}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Stock</p>
+                      <p className={`font-bold ${p.physical_stock <= 5 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {p.physical_stock} unidades
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Stock</p>
-                    <p className={`font-bold ${p.physical_stock <= 5 ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {p.physical_stock} unidades
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                  <Link
-                    to={
-                      domainFilter === 'simple'
-                        ? `/admin/catalog/edit/${p.id}`
-                        : `/admin/catalog/combo/edit/${p.id}`
-                    }
-                    className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg font-semibold text-xs hover:bg-slate-50 transition-colors"
-                  >
-                    Editar
-                  </Link>
-                  <button
-                    onClick={() => handleToggleStatus(p)}
-                    className={`px-4 py-2 rounded-lg font-semibold text-xs transition-colors ${
-                      p.is_active
-                        ? 'bg-red-50 text-red-700 hover:bg-red-100'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
-                  >
-                    {p.is_active ? 'Pausar' : 'Activar'}
-                  </button>
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <Link
+                      to={
+                        domainFilter === 'simple'
+                          ? `/admin/catalog/edit/${p.id}`
+                          : `/admin/catalog/combo/edit/${p.id}`
+                      }
+                      className="px-4 py-2 border border-slate-200 text-slate-700 rounded-lg font-semibold text-xs hover:bg-slate-50 transition-colors"
+                    >
+                      Editar
+                    </Link>
+                    <button
+                      onClick={() => handleToggleStatus(p)}
+                      className={`px-4 py-2 rounded-lg font-semibold text-xs transition-colors ${
+                        p.is_active
+                          ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
+                    >
+                      {p.is_active ? 'Pausar' : 'Activar'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="hidden md:block bg-white shadow-sm rounded-2xl border border-slate-200 overflow-hidden">
@@ -335,6 +355,7 @@ export const CatalogPage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {filteredProducts.map((p: Product) => {
+                  const thumbUrl = getPrimaryImageUrl(p);
                   const isCritical = p.physical_stock <= 5;
                   const stockPercentage = Math.min((p.physical_stock / 50) * 100, 100);
                   const marginPercentage =
@@ -347,8 +368,19 @@ export const CatalogPage = () => {
                     <tr key={p.id} className="hover:bg-slate-50/50 transition-colors bg-white group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center shrink-0">
-                            <Box className="w-5 h-5 text-slate-400" />
+                          <div className="w-12 h-12 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            {thumbUrl ? (
+                              <img
+                                src={thumbUrl}
+                                alt={p.name}
+                                loading="lazy"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : p.is_combo ? (
+                              <Layers className="w-5 h-5 text-slate-400" />
+                            ) : (
+                              <Box className="w-5 h-5 text-slate-400" />
+                            )}
                           </div>
                           <div>
                             <p className="font-bold text-slate-900 text-sm max-w-50 leading-tight truncate">
@@ -356,6 +388,11 @@ export const CatalogPage = () => {
                             </p>
                             <div className="flex items-center gap-2 mt-1.5">
                               <span className="text-[10px] text-slate-500 font-mono">SKU: {p.sku}</span>
+                              {p.images && p.images.length > 1 && (
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  · {p.images.length} fotos
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

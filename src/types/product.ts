@@ -1,3 +1,11 @@
+export interface ProductImage {
+  id: string;
+  url: string;
+  alt_text?: string | null;
+  position: number;
+  is_primary: boolean;
+}
+
 export interface Product {
   is_combo: boolean;
   id: string;
@@ -18,6 +26,7 @@ export interface Product {
     slug: string;
     path?: string;
   };
+  images?: ProductImage[];
   created_at?: string;
   updated_at?: string;
 

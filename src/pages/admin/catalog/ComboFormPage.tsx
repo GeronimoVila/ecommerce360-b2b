@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Layers, Plus, Trash2, Box } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
+import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
-import type { Product } from '../../../types/product';
+import { ProductImageUploader } from '../../../components/admin/catalog/ProductImageUploader';
+import type { Product, ProductImage } from '../../../types/product';
 
 export const ComboFormPage = () => {
   const navigate = useNavigate();
@@ -17,6 +19,12 @@ export const ComboFormPage = () => {
     base_price: 0,
     commission_rate: 0,
   });
+
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [sessionDraftIds, setSessionDraftIds] = useState<string[]>([]);
+  const [hadInitialImages, setHadInitialImages] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
 
   const [isCategoryLeaf, setIsCategoryLeaf] = useState(false);
   const [parts, setParts] = useState<{ sku: string; quantity: number }[]>([]);
@@ -49,6 +57,10 @@ export const ComboFormPage = () => {
             }));
             setParts(mappedParts);
           }
+
+          const existingImages: ProductImage[] = Array.isArray(comboData.images) ? comboData.images : [];
+          setImages(existingImages);
+          setHadInitialImages(existingImages.length > 0);
         }
       } catch (error) {
         console.error('Error inicializando combo:', error);
@@ -85,8 +97,23 @@ export const ComboFormPage = () => {
 
   const removePart = (index: number) => setParts(parts.filter((_, i) => i !== index));
 
+  const handleCancel = async () => {
+    if (isCanceling) return;
+    setIsCanceling(true);
+    try {
+      if (sessionDraftIds.length > 0) {
+        await Promise.allSettled(
+          sessionDraftIds.map((draftId) => MediaService.deleteImage(draftId))
+        );
+      }
+    } finally {
+      navigate('/admin/catalog');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploadingImages || isCanceling) return;
 
     if (!formData.category_id || !isCategoryLeaf) {
       alert('Debes seleccionar una subcategoría final (hoja) válida para el combo.');
@@ -113,11 +140,26 @@ export const ComboFormPage = () => {
     };
 
     try {
+      let targetComboId = id;
+
       if (isEditMode && id) {
         await ProductService.updateCombo(id, payload);
       } else {
-        await ProductService.createCombo(payload);
+        const createdCombo = await ProductService.createCombo(payload);
+        targetComboId = createdCombo.id;
       }
+
+      if (targetComboId && (images.length > 0 || hadInitialImages)) {
+        await MediaService.syncProductImages(
+          targetComboId,
+          images.map((img) => ({
+            id: img.id,
+            alt_text: img.alt_text || formData.name,
+            is_primary: img.is_primary,
+          }))
+        );
+      }
+
       navigate('/admin/catalog');
     } catch (error: any) {
       console.error('[Arquitectura] Error guardando combo:', error);
@@ -135,13 +177,16 @@ export const ComboFormPage = () => {
     );
   }
 
+  const isSubmitDisabled = isSubmitting || isUploadingImages || isCanceling || !isCategoryLeaf;
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
       <div>
         <button
           type="button"
-          onClick={() => navigate('/admin/catalog')}
-          className="flex items-center text-sm font-semibold text-slate-500 hover:text-[#5B50D6] transition-colors mb-4 group"
+          onClick={handleCancel}
+          disabled={isCanceling || isUploadingImages}
+          className="flex items-center text-sm font-semibold text-slate-500 hover:text-[#5B50D6] transition-colors mb-4 group disabled:opacity-50"
         >
           <ArrowLeft className="w-4 h-4 mr-1.5 transition-transform group-hover:-translate-x-1" />
           Volver al catálogo
@@ -198,6 +243,16 @@ export const ComboFormPage = () => {
                 setFormData((prev) => ({ ...prev, category_id: catId }));
                 setIsCategoryLeaf(isLeaf);
               }}
+            />
+          </div>
+
+          <div className="border-t border-slate-100 pt-5">
+            <ProductImageUploader
+              images={images}
+              productName={formData.name}
+              onChange={setImages}
+              onDraftUploaded={(imageId) => setSessionDraftIds((prev) => [...prev, imageId])}
+              onUploadingChange={setIsUploadingImages}
             />
           </div>
         </div>
@@ -338,21 +393,28 @@ export const ComboFormPage = () => {
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pb-10">
           <button
             type="button"
-            onClick={() => navigate('/admin/catalog')}
-            className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 text-sm transition-colors"
+            onClick={handleCancel}
+            disabled={isSubmitting || isUploadingImages || isCanceling}
+            className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 text-sm transition-colors disabled:opacity-50"
           >
-            Cancelar
+            {isCanceling ? 'Limpiando...' : 'Cancelar'}
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || !isCategoryLeaf}
+            disabled={isSubmitDisabled}
             className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm text-sm ${
-              isSubmitting || !isCategoryLeaf
+              isSubmitDisabled
                 ? 'bg-indigo-300 cursor-not-allowed'
                 : 'bg-[#5B50D6] hover:bg-indigo-700 shadow-indigo-600/25'
             }`}
           >
-            {isSubmitting ? 'Guardando...' : isEditMode ? 'Actualizar Combo' : 'Crear Combo'}
+            {isUploadingImages
+              ? 'Subiendo imágenes...'
+              : isSubmitting
+              ? 'Guardando...'
+              : isEditMode
+              ? 'Actualizar Combo'
+              : 'Crear Combo'}
           </button>
         </div>
       </form>

@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, DollarSign, Percent, BarChart3 } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
+import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
+import { ProductImageUploader } from '../../../components/admin/catalog/ProductImageUploader';
+import type { ProductImage } from '../../../types/product';
 
 export const ProductFormPage = () => {
   const { id } = useParams();
@@ -19,6 +22,12 @@ export const ProductFormPage = () => {
     physical_stock: 0,
     commission_rate: 0,
   });
+
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [sessionDraftIds, setSessionDraftIds] = useState<string[]>([]);
+  const [hadInitialImages, setHadInitialImages] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
 
   const [isCategoryLeaf, setIsCategoryLeaf] = useState(false);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
@@ -40,6 +49,10 @@ export const ProductFormPage = () => {
             physical_stock: Number(product.physical_stock ?? 0),
             commission_rate: Number(product.commission_rate ?? 0),
           });
+
+          const existingImages: ProductImage[] = Array.isArray(product.images) ? product.images : [];
+          setImages(existingImages);
+          setHadInitialImages(existingImages.length > 0);
         })
         .catch((err) => {
           console.error('Error hidratando datos:', err);
@@ -95,9 +108,23 @@ export const ProductFormPage = () => {
     return true;
   };
 
+  const handleCancel = async () => {
+    if (isCanceling) return;
+    setIsCanceling(true);
+    try {
+      if (sessionDraftIds.length > 0) {
+        await Promise.allSettled(
+          sessionDraftIds.map((draftId) => MediaService.deleteImage(draftId))
+        );
+      }
+    } finally {
+      navigate('/admin/catalog');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validatePayload()) return;
+    if (!validatePayload() || isUploadingImages || isCanceling) return;
 
     setIsSubmitting(true);
 
@@ -113,11 +140,26 @@ export const ProductFormPage = () => {
     };
 
     try {
+      let targetProductId = id;
+
       if (isEditMode && id) {
         await ProductService.update(id, sanitizedPayload);
       } else {
-        await ProductService.create(sanitizedPayload);
+        const created = await ProductService.create(sanitizedPayload);
+        targetProductId = created.id;
       }
+
+      if (targetProductId && (images.length > 0 || hadInitialImages)) {
+        await MediaService.syncProductImages(
+          targetProductId,
+          images.map((img) => ({
+            id: img.id,
+            alt_text: img.alt_text || formData.name,
+            is_primary: img.is_primary,
+          }))
+        );
+      }
+
       navigate('/admin/catalog');
     } catch (error: any) {
       console.error('[Arquitectura] Error de red/backend:', error);
@@ -135,13 +177,16 @@ export const ProductFormPage = () => {
     );
   }
 
+  const isSubmitDisabled = isSubmitting || isUploadingImages || isCanceling || !isCategoryLeaf;
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
       <div>
         <button
           type="button"
-          onClick={() => navigate('/admin/catalog')}
-          className="flex items-center text-sm font-semibold text-slate-500 hover:text-[#5B50D6] transition-colors mb-4 group"
+          onClick={handleCancel}
+          disabled={isCanceling || isUploadingImages}
+          className="flex items-center text-sm font-semibold text-slate-500 hover:text-[#5B50D6] transition-colors mb-4 group disabled:opacity-50"
         >
           <ArrowLeft className="w-4 h-4 mr-1.5 transition-transform group-hover:-translate-x-1" />
           Volver al catálogo
@@ -150,7 +195,7 @@ export const ProductFormPage = () => {
           {isEditMode ? 'Editar Producto Físico' : 'Crear Nuevo Producto'}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Completa los parámetros de costos, impuestos, categoría y márgenes comerciales.
+          Completa los parámetros de costos, impuestos, categoría, galería y márgenes comerciales.
         </p>
       </div>
 
@@ -194,6 +239,16 @@ export const ProductFormPage = () => {
               setFormData((prev: any) => ({ ...prev, category_id: catId }));
               setIsCategoryLeaf(isLeaf);
             }}
+          />
+        </div>
+
+        <div className="border-t border-slate-100 pt-5">
+          <ProductImageUploader
+            images={images}
+            productName={formData.name}
+            onChange={setImages}
+            onDraftUploaded={(imageId) => setSessionDraftIds((prev) => [...prev, imageId])}
+            onUploadingChange={setIsUploadingImages}
           />
         </div>
 
@@ -308,21 +363,26 @@ export const ProductFormPage = () => {
         <div className="pt-6 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
           <button
             type="button"
-            onClick={() => navigate('/admin/catalog')}
-            className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm"
+            onClick={handleCancel}
+            disabled={isSubmitting || isUploadingImages || isCanceling}
+            className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm disabled:opacity-50"
           >
-            Cancelar
+            {isCanceling ? 'Limpiando...' : 'Cancelar'}
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || !isCategoryLeaf}
+            disabled={isSubmitDisabled}
             className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-bold transition-all shadow-sm text-sm ${
-              isSubmitting || !isCategoryLeaf
+              isSubmitDisabled
                 ? 'bg-indigo-300 cursor-not-allowed'
                 : 'bg-[#5B50D6] hover:bg-indigo-700 shadow-indigo-600/25'
             }`}
           >
-            {isSubmitting ? 'Guardando...' : 'Guardar Producto'}
+            {isUploadingImages
+              ? 'Subiendo imágenes...'
+              : isSubmitting
+              ? 'Guardando...'
+              : 'Guardar Producto'}
           </button>
         </div>
       </form>
