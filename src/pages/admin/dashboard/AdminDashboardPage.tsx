@@ -30,8 +30,13 @@ export default function AdminDashboardPage() {
   }>({ activeCount: 0, alerts: [] });
 
   const [metrics, setMetrics] = useState({
-    totalRevenue: 0, revenueChange: 0, pendingCommissions: 0,
-    affiliateRevenuePercentage: 0, lowStockItems: 0
+    totalRevenue: 0,
+    revenueChange: 0,
+    pendingCommissions: 0,
+    pendingClearanceCommissions: 0,
+    pendingSharePercentage: 0,
+    affiliateRevenuePercentage: 0,
+    lowStockItems: 0
   });
 
   const [timeRange, setTimeRange] = useState<'7d' | 'month' | 'quarter'>('7d');
@@ -51,7 +56,7 @@ export default function AdminDashboardPage() {
         
         const [revenueRes, debtRes, stockRes, alertsRes, topSellersRes] = await Promise.all([
           apiClient.get('dashboard/revenue').catch(() => ({ data: { data: { netRevenue: 0, comparisonVsLastMonthPercentage: 0, affiliateRevenuePercentage: 0 } } })),
-          apiClient.get('dashboard/debt').catch(() => ({ data: { data: { pendingCommissions: 0 } } })),
+          apiClient.get('dashboard/debt').catch(() => ({ data: { data: { pendingCommissions: 0, pendingClearanceCommissions: 0, pendingSharePercentage: 0 } } })),
           apiClient.get('dashboard/inventory-alerts').catch(() => ({ data: { data: { criticalStockCount: 0 } } })),
           apiClient.get('dashboard/alerts').catch(() => ({ data: { data: { activeCount: 0, alerts: [] } } })),
           apiClient.get('dashboard/top-sellers').catch(() => ({ data: { data: [] } }))
@@ -65,6 +70,8 @@ export default function AdminDashboardPage() {
           totalRevenue: Number(revenueData.netRevenue || 0),
           revenueChange: Number(revenueData.comparisonVsLastMonthPercentage || 0),
           pendingCommissions: Number(debtData.pendingCommissions || 0),
+          pendingClearanceCommissions: Number(debtData.pendingClearanceCommissions || 0),
+          pendingSharePercentage: Number(debtData.pendingSharePercentage || 0),
           affiliateRevenuePercentage: Number(revenueData.affiliateRevenuePercentage || 0),
           lowStockItems: Number(stockData.criticalStockCount || 0)
         });
@@ -175,8 +182,13 @@ export default function AdminDashboardPage() {
                 ${metrics.pendingCommissions.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
               </div>
               <div className="flex items-center justify-between mt-2 text-xs">
-                <span className="text-rose-500 font-medium flex items-center gap-1">
-                  <ArrowDownRight className="w-3.5 h-3.5" /> -4.2% pendiente
+                <span
+                  className={`font-medium flex items-center gap-1 ${
+                    metrics.pendingSharePercentage > 0 ? 'text-amber-600' : 'text-slate-500'
+                  }`}
+                  title={`$${metrics.pendingClearanceCommissions.toLocaleString('es-AR')} en ventana de garantía`}
+                >
+                  {metrics.pendingSharePercentage}% a liberar
                 </span>
                 <a href="/admin/commissions" className="text-indigo-600 font-semibold hover:underline">
                   Ver liquidaciones →

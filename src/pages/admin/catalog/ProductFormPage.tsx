@@ -22,24 +22,30 @@ export const ProductFormPage = () => {
 
   const [isCategoryLeaf, setIsCategoryLeaf] = useState(false);
   const [calculatedPrice, setCalculatedPrice] = useState(0);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isEditMode && id) {
+      setIsLoadingProduct(true);
       ProductService.getById(id)
-        .then((product) => {
+        .then((product: any) => {
           setFormData({
             sku: product.sku || '',
             name: product.name || '',
             category_id: product.category_id || product.category?.id || '',
-            purchase_cost: Number(product.purchase_cost) || 0,
-            vat_rate: Number(product.vat_rate) || 0,
-            profit_margin: Number(product.profit_margin) || 0,
-            physical_stock: Number(product.physical_stock) || 0,
-            commission_rate: Number(product.commission_rate) || 0,
+            purchase_cost: Number(product.purchase_cost ?? 0),
+            vat_rate: Number(product.vat_rate ?? 21),
+            profit_margin: Number(product.profit_margin ?? 0),
+            physical_stock: Number(product.physical_stock ?? 0),
+            commission_rate: Number(product.commission_rate ?? 0),
           });
         })
-        .catch((err) => console.error('Error hidratando datos:', err));
+        .catch((err) => {
+          console.error('Error hidratando datos:', err);
+          alert(err.response?.data?.error || 'No se pudieron cargar los datos del producto.');
+        })
+        .finally(() => setIsLoadingProduct(false));
     }
   }, [id, isEditMode]);
 
@@ -120,6 +126,14 @@ export const ProductFormPage = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoadingProduct) {
+    return (
+      <div className="p-16 flex justify-center items-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#5B50D6]" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
