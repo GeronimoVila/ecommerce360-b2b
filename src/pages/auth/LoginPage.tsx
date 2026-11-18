@@ -1,31 +1,58 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { Zap, TrendingUp, Wallet, Lock, AtSign, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import { useAuthStore } from '../../store/authStore';
 
+interface LoginFormValues {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
+
 export const LoginPage = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    defaultValues: {
+      email: '',
+      password: '',
+      rememberMe: true,
+    },
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  
-  const login = useAuthStore((state) => state.login);
+
+  const { login, isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
 
-  const onSubmit = async (data: any) => {
+  if (isAuthenticated && user) {
+    return (
+      <Navigate
+        to={user.role === 'ADMIN' ? '/admin/dashboard' : '/portal/dashboard'}
+        replace
+      />
+    );
+  }
+
+  const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setApiError(null);
-    
+
     try {
       const response = await apiClient.post('auth/login', {
         email: data.email,
         password: data.password,
+        rememberMe: Boolean(data.rememberMe),
       });
 
       login(response.data.user);
-      
+
       if (response.data.user.role === 'ADMIN') {
         navigate('/admin/dashboard');
       } else {
@@ -43,13 +70,14 @@ export const LoginPage = () => {
 
   return (
     <div className="min-h-screen w-full flex font-sans">
-      
-      <div className="hidden lg:flex lg:w-1/2 bg-[#0d111c] relative flex-col justify-between p-12 xl:p-16 text-white border-r border-slate-800"
-           style={{
-             backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-             backgroundSize: '40px 40px'
-           }}>
-        
+      <div
+        className="hidden lg:flex lg:w-1/2 bg-[#0d111c] relative flex-col justify-between p-12 xl:p-16 text-white border-r border-slate-800"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }}
+      >
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <Zap className="w-6 h-6 text-white fill-white" />
@@ -119,7 +147,10 @@ export const LoginPage = () => {
           </div>
 
           <div className="space-y-3 mb-8">
-            <button type="button" className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+            <button
+              type="button"
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -154,15 +185,19 @@ export const LoginPage = () => {
                   type="text"
                   autoComplete="email"
                   className={`block w-full pl-10 pr-4 py-3 rounded-xl border bg-white text-sm transition-all focus:outline-none focus:ring-2 ${
-                    errors.email 
-                      ? 'border-red-300 focus:ring-red-500' 
+                    errors.email
+                      ? 'border-red-300 focus:ring-red-500'
                       : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
                   }`}
                   placeholder="marcelo.vega@distribuidora-uyo.com.ar"
                   {...register('email', { required: 'El identificador es obligatorio' })}
                 />
               </div>
-              {errors.email && <span className="text-red-500 text-xs mt-1.5 block font-medium">{String(errors.email.message)}</span>}
+              {errors.email && (
+                <span className="text-red-500 text-xs mt-1.5 block font-medium">
+                  {String(errors.email.message)}
+                </span>
+              )}
             </div>
 
             <div>
@@ -178,8 +213,8 @@ export const LoginPage = () => {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   className={`block w-full pl-10 pr-12 py-3 rounded-xl border bg-white text-sm transition-all focus:outline-none focus:ring-2 ${
-                    errors.password 
-                      ? 'border-red-300 focus:ring-red-500' 
+                    errors.password
+                      ? 'border-red-300 focus:ring-red-500'
                       : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
                   }`}
                   placeholder="••••••••••••"
@@ -193,18 +228,38 @@ export const LoginPage = () => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {errors.password && <span className="text-red-500 text-xs mt-1.5 block font-medium">{String(errors.password.message)}</span>}
+              {errors.password && (
+                <span className="text-red-500 text-xs mt-1.5 block font-medium">
+                  {String(errors.password.message)}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-2">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <div className="relative flex items-center justify-center w-5 h-5">
-                  <input type="checkbox" className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded bg-white checked:bg-indigo-600 checked:border-indigo-600 transition-colors cursor-pointer" />
-                  <svg className="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 14 14" fill="none">
-                    <path d="M3 8L6 11L11 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <input
+                    type="checkbox"
+                    {...register('rememberMe')}
+                    className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded bg-white checked:bg-indigo-600 checked:border-indigo-600 transition-colors cursor-pointer"
+                  />
+                  <svg
+                    className="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                  >
+                    <path
+                      d="M3 8L6 11L11 3.5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </div>
-                <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">Recordarme por 30 días</span>
+                <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+                  Mantener sesión iniciada
+                </span>
               </label>
               <a href="/recuperar" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">
                 ¿Olvidaste tu contraseña?
@@ -232,12 +287,14 @@ export const LoginPage = () => {
               )}
             </button>
           </form>
-
         </div>
 
         <div className="mt-auto pt-8 flex flex-col items-center border-t border-slate-100 text-xs text-slate-500 text-center">
           <p className="mb-2">
-            ¿Problemas para acceder? Contacta a la <a href="/soporte" className="text-indigo-600 font-medium">Mesa de Ayuda Técnica</a>
+            ¿Problemas para acceder? Contacta a la{' '}
+            <a href="/soporte" className="text-indigo-600 font-medium">
+              Mesa de Ayuda Técnica
+            </a>
           </p>
           <p>© 2026 ELECTROTECH Systems Inc. Todos los derechos reservados.</p>
         </div>
