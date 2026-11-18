@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import type { GroupedCommission, LiquidatePayload, PayoutHistory } from '../types/commission';
+import type { GroupedCommission, LiquidatePayload, PayoutHistory, CommissionStatus, MyCommissionsResponse, MyPayoutItem } from '../types/commission';
 
 export const CommissionService = {
   getAvailable: async (): Promise<GroupedCommission[]> => {
@@ -15,5 +15,17 @@ export const CommissionService = {
   getPayouts: async (): Promise<PayoutHistory[]> => {
     const response = await apiClient.get('/commissions/payouts');
     return response.data.data;
-  }
+  },
+
+  getMyCommissions: async (status?: CommissionStatus): Promise<MyCommissionsResponse> => {
+    const response = await apiClient.get('/commissions/my-commissions', {
+      params: status ? { status } : undefined,
+    });
+    return response.data;
+  },
+
+  getMyPayouts: async (): Promise<MyPayoutItem[]> => {
+    const response = await apiClient.get('/commissions/my-payouts');
+    return response.data.data;
+  },
 };

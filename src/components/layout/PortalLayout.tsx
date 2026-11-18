@@ -205,20 +205,37 @@ export const PortalLayout = () => {
           )}
 
           {user?.role === 'SELLER' && (
-            <NavLink 
-              to="/portal/profile"
-              onClick={closeMenu}
-              className={({ isActive }) => 
-                `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  isActive 
-                    ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30' 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`
-              }
-            >
-              <User className="w-5 h-5" />
-              <span>Perfil</span>
-            </NavLink>
+            <>
+              <NavLink
+                to="/portal/commissions"
+                onClick={closeMenu}
+                className={({ isActive }) =>
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`
+                }
+              >
+                <Wallet className="w-5 h-5" />
+                <span>Mis Comisiones</span>
+              </NavLink>
+
+              <NavLink 
+                to="/portal/profile"
+                onClick={closeMenu}
+                className={({ isActive }) => 
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30' 
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`
+                }
+              >
+                <User className="w-5 h-5" />
+                <span>Perfil</span>
+              </NavLink>
+            </>
           )}
         </nav>
 

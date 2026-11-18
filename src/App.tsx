@@ -17,6 +17,7 @@ const FinancialRulesPage = lazy(() => import('./pages/admin/financial/FinancialR
 const SellersManagementPage = lazy(() => import('./pages/admin/team/SellersManagementPage').then(module => ({ default: module.SellersManagementPage })));
 const CommissionsPage = lazy(() => import('./components/admin/financial/CommissionsPage').then(module => ({ default: module.CommissionsPage })));
 const CategoriesPage = lazy(() => import('./pages/admin/catalog/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
+const SellerCommissionsPage = lazy(() => import('./pages/seller/commissions/SellerCommissionsPage'));
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -64,6 +65,12 @@ function App() {
               <Route path="/admin/team" element={<SellersManagementPage />} />
               <Route path="/admin/commissions" element={<CommissionsPage />} />
               <Route path="/admin/categories" element={<CategoriesPage />} />
+            </Route>
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={['SELLER']} />}>
+            <Route element={<PortalLayout />}>
+              <Route path="/portal/commissions" element={<SellerCommissionsPage />} />
             </Route>
           </Route>
 
