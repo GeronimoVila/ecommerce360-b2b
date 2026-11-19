@@ -18,6 +18,7 @@ const SellersManagementPage = lazy(() => import('./pages/admin/team/SellersManag
 const CommissionsPage = lazy(() => import('./components/admin/financial/CommissionsPage').then(module => ({ default: module.CommissionsPage })));
 const CategoriesPage = lazy(() => import('./pages/admin/catalog/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
 const SellerCommissionsPage = lazy(() => import('./pages/seller/commissions/SellerCommissionsPage'));
+const SalesManagementPage = lazy(() => import('./pages/orders/SalesManagementPage').then((m) => ({ default: m.SalesManagementPage })));
 
 function App() {
   const { checkSession, isCheckingAuth } = useAuthStore();
@@ -55,6 +56,7 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
             <Route element={<PortalLayout />}>
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/admin/sales" element={<SalesManagementPage />} />
               <Route path="/admin/catalog" element={<CatalogPage />} />
               <Route path="/admin/catalog/new" element={<ProductFormPage />} />
               <Route path="/admin/catalog/edit/:id" element={<ProductFormPage />} />
@@ -70,6 +72,7 @@ function App() {
 
           <Route element={<ProtectedRoute allowedRoles={['SELLER']} />}>
             <Route element={<PortalLayout />}>
+              <Route path="/portal/sales" element={<SalesManagementPage />} />
               <Route path="/portal/commissions" element={<SellerCommissionsPage />} />
             </Route>
           </Route>

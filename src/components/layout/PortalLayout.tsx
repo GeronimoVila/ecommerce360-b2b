@@ -3,7 +3,7 @@ import { Outlet, useNavigate, NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Package, Truck, Sliders, Wallet, Users, 
   FilePlus, User, LogOut, Menu, X, Layers,
-  FolderTree
+  FolderTree, ShoppingBag
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../services/apiClient';
@@ -110,6 +110,25 @@ export const PortalLayout = () => {
             <span>Inicio</span>
           </NavLink>
 
+          {user?.role === 'SELLER' && (
+            <div className="mb-6 px-1">
+              <NavLink
+                to="/portal/sales"
+                onClick={closeMenu}
+                className={({ isActive }) =>
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`
+                }
+              >
+                <ShoppingBag className="w-5 h-5" />
+                <span>Mis Ventas</span>
+              </NavLink>
+            </div>
+          )}
+
           {user?.role === 'ADMIN' && (
             <>
               <NavLink 
@@ -125,6 +144,21 @@ export const PortalLayout = () => {
               >
                 <Package className="w-5 h-5" />
                 <span>Productos</span>
+              </NavLink>
+
+              <NavLink 
+                to="/admin/sales"
+                onClick={closeMenu}
+                className={({ isActive }) => 
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/30' 
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`
+                }
+              >
+                <ShoppingBag className="w-5 h-5" />
+                <span>Ventas</span>
               </NavLink>
 
               <NavLink

@@ -1,10 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ProductService } from '../../services/product.service';
 import { BudgetService } from '../../services/budget.service';
 import type { Product } from '../../types/product';
-import { 
-  Calculator, Search, Plus, Trash2, Zap, 
-  CheckCircle2, Copy, Package, User 
+import {
+  Calculator,
+  Search,
+  Plus,
+  Trash2,
+  Zap,
+  CheckCircle2,
+  Copy,
+  Package,
+  User,
+  AlertCircle,
+  Ban,
 } from 'lucide-react';
 
 interface CartItem {
@@ -12,16 +21,45 @@ interface CartItem {
   quantity: number;
 }
 
+function getEffectiveStock(product: Product): number {
+  const anyProduct = product as Product & {
+    available_stock?: number;
+    combo_parts?: Array<{
+      quantity: number;
+      product?: { physical_stock?: number };
+    }>;
+  };
+
+  if (typeof anyProduct.available_stock === 'number') {
+    return Math.max(0, anyProduct.available_stock);
+  }
+
+  if (product.is_combo) {
+    if (!anyProduct.combo_parts || anyProduct.combo_parts.length === 0) {
+      return 0;
+    }
+    const limits = anyProduct.combo_parts.map((part) => {
+      const partStock = part.product?.physical_stock ?? 0;
+      return part.quantity > 0 ? Math.floor(partStock / part.quantity) : 0;
+    });
+    return Math.max(0, Math.min(...limits));
+  }
+
+  return Math.max(0, product.physical_stock ?? 0);
+}
+
 export const CreateBudgetPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [onlyInStock, setOnlyInStock] = useState(false);
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'MP' | 'MOBBEX' | 'TRANSFERENCIA'>('MP');
   const [customerId, setCustomerId] = useState('');
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [createdBudget, setCreatedBudget] = useState<{ id: string; total: number; expiresAt: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -53,19 +91,53 @@ export const CreateBudgetPage = () => {
   }, []);
 
   const safeProducts = Array.isArray(products) ? products : [];
-  const filteredProducts = safeProducts.filter(p => {
-    if (!p) return false;
-    const name = p.name ? String(p.name).toLowerCase() : '';
-    const sku = p.sku ? String(p.sku).toLowerCase() : '';
-    const term = searchTerm.toLowerCase();
-    return name.includes(term) || sku.includes(term);
-  });
+
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return safeProducts.filter((p) => {
+      if (!p) return false;
+      const stock = getEffectiveStock(p);
+      if (onlyInStock && stock <= 0) return false;
+
+      if (!term) return true;
+      const name = p.name ? String(p.name).toLowerCase() : '';
+      const sku = p.sku ? String(p.sku).toLowerCase() : '';
+      return name.includes(term) || sku.includes(term);
+    });
+  }, [safeProducts, searchTerm, onlyInStock]);
+
+  const cartQtyMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of cart) {
+      map.set(item.product.id, item.quantity);
+    }
+    return map;
+  }, [cart]);
+
+  const stockIssues = useMemo(() => {
+    return cart.filter((item) => {
+      const available = getEffectiveStock(item.product);
+      return available <= 0 || item.quantity > available;
+    });
+  }, [cart]);
 
   const handleAddToCart = (product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+    setErrorMsg(null);
+    const availableStock = getEffectiveStock(product);
+
+    if (availableStock <= 0) {
+      setErrorMsg(`El producto "${product.name}" no tiene stock disponible.`);
+      return;
+    }
+
+    setCart((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        return prev.map(item => 
+        if (existing.quantity >= availableStock) {
+          setErrorMsg(`Alcanzaste el stock máximo disponible (${availableStock} un.) para "${product.name}".`);
+          return prev;
+        }
+        return prev.map((item) =>
           item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
@@ -73,51 +145,75 @@ export const CreateBudgetPage = () => {
     });
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
+  const handleUpdateQuantity = (productId: string, rawQuantity: number) => {
+    setErrorMsg(null);
+    if (rawQuantity <= 0) {
       handleRemoveItem(productId);
       return;
     }
-    setCart(prev => prev.map(item => 
-      item.product.id === productId ? { ...item, quantity } : item
-    ));
+
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.product.id !== productId) return item;
+        const maxStock = getEffectiveStock(item.product);
+        if (maxStock <= 0) {
+          setErrorMsg(`"${item.product.name}" se quedó sin stock disponible.`);
+          return item;
+        }
+        if (rawQuantity > maxStock) {
+          setErrorMsg(`Solo hay ${maxStock} unidades disponibles de "${item.product.name}".`);
+          return { ...item, quantity: maxStock };
+        }
+        return { ...item, quantity: rawQuantity };
+      })
+    );
   };
 
   const handleRemoveItem = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+    setErrorMsg(null);
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
   };
 
   const calculateTotal = () => {
     return cart.reduce((acc, item) => {
       const price = Number(item.product?.base_price) || 0;
-      return acc + (price * item.quantity);
+      return acc + price * item.quantity;
     }, 0);
   };
 
   const handleCreateBudget = async () => {
+    setErrorMsg(null);
+
     if (cart.length === 0) {
-      alert('Debes agregar al menos un producto al presupuesto.');
+      setErrorMsg('Debes agregar al menos un producto al presupuesto.');
+      return;
+    }
+
+    if (stockIssues.length > 0) {
+      const names = stockIssues.map((i) => i.product.name).join(', ');
+      setErrorMsg(`Corrige el stock antes de continuar: ${names}.`);
       return;
     }
 
     setIsSubmitting(true);
     try {
       const payload = {
-        items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity })),
+        items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
         paymentMethod,
-        customerId: customerId.trim() || undefined
+        customerId: customerId.trim() || undefined,
       };
 
       const res = await BudgetService.create(payload);
       setCreatedBudget({
         id: res.budget.id,
         total: Number(res.budget.total_amount) || 0,
-        expiresAt: res.budget.expires_at
+        expiresAt: res.budget.expires_at,
       });
       setCart([]);
     } catch (error: any) {
       console.error('[POS Budget] Error:', error);
-      alert(error.response?.data?.error || 'Error al generar el presupuesto.');
+      const apiErr = error.response?.data?.details || error.response?.data?.error;
+      setErrorMsg(apiErr || 'Error al generar el presupuesto.');
     } finally {
       setIsSubmitting(false);
     }
@@ -133,7 +229,6 @@ export const CreateBudgetPage = () => {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
-    
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-[#5B50D6] flex items-center justify-center shrink-0">
@@ -141,21 +236,40 @@ export const CreateBudgetPage = () => {
           </div>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Armador de Presupuestos (POS)</h1>
-            <p className="text-sm text-slate-500 mt-1">Selecciona productos del catálogo, define la pasarela y genera un link de pago con 48h de validez.</p>
+            <p className="text-sm text-slate-500 mt-1">
+              Selecciona productos con stock disponible, define la pasarela y genera un link de pago con 48h de validez.
+            </p>
           </div>
         </div>
       </div>
 
+      {errorMsg && (
+        <div
+          role="alert"
+          className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm font-semibold flex items-center justify-between gap-2"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            className="text-xs underline hover:text-rose-900"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
         <div className="lg:col-span-7 space-y-4">
-          
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-            <div className="relative">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+            <div className="relative flex-1">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
                 <Search className="w-4 h-4" />
               </span>
-              <input 
+              <input
                 type="text"
                 placeholder="Buscar por nombre, marca o SKU..."
                 value={searchTerm}
@@ -168,6 +282,16 @@ export const CreateBudgetPage = () => {
                 </kbd>
               </div>
             </div>
+
+            <label className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 text-xs font-semibold text-slate-700 cursor-pointer select-none hover:bg-slate-100/70 transition-colors">
+              <input
+                type="checkbox"
+                checked={onlyInStock}
+                onChange={(e) => setOnlyInStock(e.target.checked)}
+                className="rounded border-slate-300 text-[#5B50D6] focus:ring-[#5B50D6]"
+              />
+              Solo con stock
+            </label>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 min-h-100 max-h-162.5 overflow-y-auto">
@@ -182,21 +306,47 @@ export const CreateBudgetPage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filteredProducts.map(product => {
+                {filteredProducts.map((product) => {
                   const basePrice = Number(product.base_price) || 0;
-                  const stock = product.physical_stock ?? 0;
+                  const stock = getEffectiveStock(product);
+                  const inCartQty = cartQtyMap.get(product.id) ?? 0;
+                  const remainingStock = Math.max(0, stock - inCartQty);
+                  const isOutOfStock = stock <= 0;
+                  const isMaxReached = !isOutOfStock && remainingStock === 0;
+
                   return (
-                    <div key={product.id} className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col justify-between hover:border-[#5B50D6]/40 hover:shadow-md transition-all">
+                    <div
+                      key={product.id}
+                      className={`border rounded-2xl p-4 flex flex-col justify-between transition-all ${
+                        isOutOfStock
+                          ? 'border-slate-200/80 bg-slate-50/70 opacity-75'
+                          : 'border-slate-200 bg-white hover:border-[#5B50D6]/40 hover:shadow-md'
+                      }`}
+                    >
                       <div>
                         <div className="flex justify-between items-start gap-2">
                           <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-bold border border-slate-200">
                             {product.sku}
                           </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
-                            stock > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${stock > 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                            {stock} un.
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                              isOutOfStock
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                : remainingStock <= 3
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                                : 'bg-emerald-50 text-emerald-700'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                isOutOfStock
+                                  ? 'bg-rose-500'
+                                  : remainingStock <= 3
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
+                              }`}
+                            ></span>
+                            {isOutOfStock ? 'Sin stock' : `${remainingStock} disp.`}
                           </span>
                         </div>
                         <h4 className="font-bold text-slate-900 text-sm mt-2 line-clamp-2">{product.name}</h4>
@@ -204,16 +354,42 @@ export const CreateBudgetPage = () => {
 
                       <div className="mt-4 flex justify-between items-end pt-3 border-t border-slate-100">
                         <div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Precio Base</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Precio Base
+                          </span>
                           <span className="font-mono font-extrabold text-[#5B50D6] text-base">
                             ${basePrice.toLocaleString()}
                           </span>
                         </div>
-                        <button 
+
+                        <button
+                          type="button"
                           onClick={() => handleAddToCart(product)}
-                          className="bg-[#1A1D27] text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 active:scale-95 transition-all shadow-sm flex items-center gap-1"
+                          disabled={isOutOfStock || isMaxReached}
+                          title={
+                            isOutOfStock
+                              ? 'Producto sin stock disponible'
+                              : isMaxReached
+                              ? 'Ya agregaste todas las unidades disponibles'
+                              : 'Agregar al presupuesto'
+                          }
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 ${
+                            isOutOfStock || isMaxReached
+                              ? 'bg-slate-200 text-slate-500 cursor-not-allowed shadow-none'
+                              : 'bg-[#1A1D27] text-white hover:bg-slate-800 active:scale-95'
+                          }`}
                         >
-                          <Plus className="w-3.5 h-3.5" /> Agregar
+                          {isOutOfStock ? (
+                            <>
+                              <Ban className="w-3.5 h-3.5" /> Sin stock
+                            </>
+                          ) : isMaxReached ? (
+                            'Tope en carrito'
+                          ) : (
+                            <>
+                              <Plus className="w-3.5 h-3.5" /> Agregar
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -230,39 +406,59 @@ export const CreateBudgetPage = () => {
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <h2 className="text-base font-bold text-slate-900">Detalle del Presupuesto</h2>
                 {cart.length > 0 && (
-                  <button 
-                    onClick={() => setCart([])}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCart([]);
+                      setErrorMsg(null);
+                    }}
                     className="text-xs font-semibold text-rose-600 hover:text-rose-700 transition-colors flex items-center gap-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Limpiar todo
                   </button>
                 )}
               </div>
-              
+
               {cart.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-slate-100">
-                  El carrito está vacío. Haz clic en "+ Agregar" en los productos del catálogo.
+                  El carrito está vacío. Haz clic en "+ Agregar" en los productos con stock disponible.
                 </div>
               ) : (
                 <div className="space-y-3 max-h-85 overflow-y-auto pr-1">
-                  {cart.map(item => {
+                  {cart.map((item) => {
                     const price = Number(item.product?.base_price) || 0;
+                    const maxStock = getEffectiveStock(item.product);
+                    const hasIssue = maxStock <= 0 || item.quantity > maxStock;
+
                     return (
-                      <div key={item.product.id} className="flex justify-between items-center bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                      <div
+                        key={item.product.id}
+                        className={`flex justify-between items-center p-3 rounded-xl border ${
+                          hasIssue
+                            ? 'bg-rose-50/70 border-rose-200'
+                            : 'bg-slate-50/70 border-slate-100'
+                        }`}
+                      >
                         <div className="flex-1 pr-2">
                           <p className="text-xs font-bold text-slate-900 line-clamp-1">{item.product.name}</p>
-                          <p className="text-[11px] font-mono text-slate-500 mt-0.5">${price.toLocaleString()} c/u</p>
+                          <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+                            ${price.toLocaleString()} c/u · Máx: {maxStock} un.
+                          </p>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
-                          <input 
-                            type="number" 
-                            min="1"
+                          <input
+                            type="number"
+                            min={1}
+                            max={maxStock > 0 ? maxStock : 1}
                             value={item.quantity}
-                            onChange={(e) => handleUpdateQuantity(item.product.id, parseInt(e.target.value, 10) || 0)}
-                            className="w-14 border border-slate-200 rounded-lg p-1.5 text-center text-xs font-bold bg-white font-mono shadow-sm"
+                            onChange={(e) =>
+                              handleUpdateQuantity(item.product.id, parseInt(e.target.value, 10) || 0)
+                            }
+                            className="w-16 border border-slate-200 rounded-lg p-1.5 text-center text-xs font-bold bg-white font-mono shadow-sm"
                           />
-                          <button 
+                          <button
+                            type="button"
                             onClick={() => handleRemoveItem(item.product.id)}
                             className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
                           >
@@ -278,9 +474,11 @@ export const CreateBudgetPage = () => {
 
             <div className="mt-6 pt-4 border-t border-slate-100 space-y-4">
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Método de Pago Sugerido</label>
-                <select 
-                  value={paymentMethod} 
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Método de Pago Sugerido
+                </label>
+                <select
+                  value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as any)}
                   className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white font-semibold text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm"
                 >
@@ -291,12 +489,14 @@ export const CreateBudgetPage = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">ID Cliente B2C / Razón Social (Opcional)</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  ID Cliente B2C / Razón Social (Opcional)
+                </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
                     <User className="w-4 h-4" />
                   </span>
-                  <input 
+                  <input
                     type="text"
                     placeholder="UUID del cliente o Razón Social"
                     value={customerId}
@@ -317,9 +517,10 @@ export const CreateBudgetPage = () => {
               </div>
 
               <button
+                type="button"
                 onClick={handleCreateBudget}
-                disabled={cart.length === 0 || isSubmitting}
-                className="w-full bg-[#5B50D6] text-white py-3.5 rounded-xl font-bold shadow-sm shadow-indigo-600/25 hover:bg-indigo-700 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-sm"
+                disabled={cart.length === 0 || isSubmitting || stockIssues.length > 0}
+                className="w-full bg-[#5B50D6] text-white py-3.5 rounded-xl font-bold shadow-sm shadow-indigo-600/25 hover:bg-indigo-700 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-sm"
               >
                 {isSubmitting ? (
                   'Procesando...'
@@ -332,7 +533,6 @@ export const CreateBudgetPage = () => {
             </div>
           </div>
         </div>
-
       </div>
 
       {createdBudget && (
@@ -343,7 +543,9 @@ export const CreateBudgetPage = () => {
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-extrabold">¡Presupuesto Creado!</h3>
-              <p className="text-xs text-slate-400 mt-1">El enlace de pago estará activo durante las próximas 48 horas.</p>
+              <p className="text-xs text-slate-400 mt-1">
+                El enlace de pago estará activo durante las próximas 48 horas.
+              </p>
             </div>
 
             <div className="p-6 space-y-4">
@@ -354,24 +556,31 @@ export const CreateBudgetPage = () => {
                 </div>
                 <div className="flex justify-between text-xs text-slate-600">
                   <span>Monto Total:</span>
-                  <span className="font-mono font-bold text-[#5B50D6] text-sm">${createdBudget.total.toLocaleString()}</span>
+                  <span className="font-mono font-bold text-[#5B50D6] text-sm">
+                    ${createdBudget.total.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs text-slate-600">
                   <span>Expira el:</span>
-                  <span className="font-bold text-amber-600">{new Date(createdBudget.expiresAt).toLocaleString()}</span>
+                  <span className="font-bold text-amber-600">
+                    {new Date(createdBudget.expiresAt).toLocaleString()}
+                  </span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Enlace de Pago para el Cliente</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Enlace de Pago para el Cliente
+                </label>
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    readOnly 
-                    value={checkoutLink} 
+                  <input
+                    type="text"
+                    readOnly
+                    value={checkoutLink}
                     className="w-full border border-slate-200 rounded-xl p-3 text-xs font-mono bg-slate-50 text-slate-700 shadow-sm"
                   />
-                  <button 
+                  <button
+                    type="button"
                     onClick={handleCopyLink}
                     className="whitespace-nowrap px-5 py-3 bg-[#1A1D27] text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors shadow-sm flex items-center gap-1.5"
                   >
@@ -381,7 +590,8 @@ export const CreateBudgetPage = () => {
               </div>
 
               <div className="pt-4 border-t border-slate-100 flex justify-end">
-                <button 
+                <button
+                  type="button"
                   onClick={() => setCreatedBudget(null)}
                   className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-200 transition-colors"
                 >
