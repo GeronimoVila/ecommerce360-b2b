@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Layers, Plus, Trash2, Box } from 'lucide-react';
+import { ArrowLeft, Layers, Plus, Trash2, Box, AlertCircle } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
 import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 import { ProductImageUploader } from '../../../components/admin/catalog/ProductImageUploader';
 import type { Product, ProductImage } from '../../../types/product';
+
+interface FieldErrors {
+  sku?: string;
+  name?: string;
+  general?: string;
+}
 
 export const ComboFormPage = () => {
   const navigate = useNavigate();
@@ -20,6 +26,7 @@ export const ComboFormPage = () => {
     commission_rate: 0,
   });
 
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [images, setImages] = useState<ProductImage[]>([]);
   const [sessionDraftIds, setSessionDraftIds] = useState<string[]>([]);
   const [hadInitialImages, setHadInitialImages] = useState(false);
@@ -81,6 +88,11 @@ export const ComboFormPage = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
+
+    if (name === 'sku' || name === 'name') {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value,
@@ -115,24 +127,29 @@ export const ComboFormPage = () => {
     e.preventDefault();
     if (isUploadingImages || isCanceling) return;
 
+    const errors: FieldErrors = {};
+    if (!formData.sku.trim()) errors.sku = 'El SKU del combo es obligatorio.';
+    if (!formData.name.trim()) errors.name = 'El nombre comercial es obligatorio.';
+
     if (!formData.category_id || !isCategoryLeaf) {
-      alert('Debes seleccionar una subcategoría final (hoja) válida para el combo.');
-      return;
+      errors.general = 'Debes seleccionar una subcategoría final (hoja) válida para el combo.';
+    } else if (parts.length === 0) {
+      errors.general = 'El combo debe tener al menos 1 producto componente.';
+    } else if (parts.some((p) => p.sku === '' || p.quantity <= 0)) {
+      errors.general = 'Verifica que todos los componentes tengan un producto seleccionado y cantidad mayor a 0.';
     }
-    if (parts.length === 0) {
-      alert('El combo debe tener al menos 1 producto componente.');
-      return;
-    }
-    if (parts.some((p) => p.sku === '' || p.quantity <= 0)) {
-      alert('Verifica que todos los componentes tengan un producto seleccionado y cantidad mayor a 0.');
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
     setIsSubmitting(true);
+    setFieldErrors({});
 
     const payload = {
-      sku: formData.sku,
-      name: formData.name,
+      sku: formData.sku.trim().toUpperCase(),
+      name: formData.name.trim(),
       category_id: formData.category_id,
       base_price: Number(formData.base_price),
       commission_rate: Number(formData.commission_rate),
@@ -154,7 +171,7 @@ export const ComboFormPage = () => {
           targetComboId,
           images.map((img) => ({
             id: img.id,
-            alt_text: img.alt_text || formData.name,
+            alt_text: img.alt_text || payload.name,
             is_primary: img.is_primary,
           }))
         );
@@ -163,7 +180,15 @@ export const ComboFormPage = () => {
       navigate('/admin/catalog');
     } catch (error: any) {
       console.error('[Arquitectura] Error guardando combo:', error);
-      alert(error.response?.data?.error || 'Hubo un error al guardar el combo.');
+      const status = error.response?.status;
+      const backendError = error.response?.data?.error || 'Hubo un error al guardar el combo.';
+      const conflictField = error.response?.data?.field as 'sku' | 'name' | undefined;
+
+      if (status === 409 && conflictField) {
+        setFieldErrors({ [conflictField]: backendError });
+      } else {
+        setFieldErrors({ general: backendError });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -200,6 +225,13 @@ export const ComboFormPage = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {fieldErrors.general && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-700 text-sm font-medium">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{fieldErrors.general}</span>
+          </div>
+        )}
+
         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-5">
           <h2 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100 flex items-center gap-2">
             <Layers className="w-5 h-5 text-[#5B50D6]" /> Información del Paquete
@@ -216,9 +248,19 @@ export const ComboFormPage = () => {
                 onChange={handleChange}
                 required
                 disabled={isEditMode}
-                className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
+                className={`mt-1 block w-full border rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 focus:ring-2 transition-colors text-sm shadow-sm font-mono ${
+                  fieldErrors.sku
+                    ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-200 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6]'
+                }`}
                 placeholder="Ej. COMBO-VERANO-24"
               />
+              {fieldErrors.sku && (
+                <p className="mt-1.5 text-xs font-semibold text-rose-600 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {fieldErrors.sku}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
@@ -231,8 +273,18 @@ export const ComboFormPage = () => {
                 onChange={handleChange}
                 required
                 placeholder="Ej. Kit Residencial Inverter"
-                className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm"
+                className={`mt-1 block w-full border rounded-xl p-3 bg-white text-slate-900 focus:ring-2 transition-colors text-sm shadow-sm ${
+                  fieldErrors.name
+                    ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-200 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6]'
+                }`}
               />
+              {fieldErrors.name && (
+                <p className="mt-1.5 text-xs font-semibold text-rose-600 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {fieldErrors.name}
+                </p>
+              )}
             </div>
           </div>
 

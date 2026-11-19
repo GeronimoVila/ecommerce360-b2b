@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, PackagePlus } from 'lucide-react';
+import { X, PackagePlus, AlertCircle } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 import type { Product } from '../../../types/product';
@@ -8,6 +8,12 @@ interface QuickProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (newProduct: Product) => void;
+}
+
+interface FieldErrors {
+  sku?: string;
+  name?: string;
+  general?: string;
 }
 
 export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductModalProps) => {
@@ -21,6 +27,7 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
     commission_rate: 5,
   });
 
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isCategoryLeaf, setIsCategoryLeaf] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,6 +35,11 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
+
+    if (name === 'sku' || name === 'name') {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value,
@@ -37,15 +49,18 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.category_id || !isCategoryLeaf) {
-      alert('Debes seleccionar una subcategoría final (hoja) válida.');
+      setFieldErrors({ general: 'Debes seleccionar una subcategoría final (hoja) válida.' });
       return;
     }
 
     setIsSubmitting(true);
+    setFieldErrors({});
 
     try {
       const payload = {
         ...formData,
+        sku: formData.sku.trim().toUpperCase(),
+        name: formData.name.trim(),
         purchase_cost: Number(formData.purchase_cost),
         vat_rate: Number(formData.vat_rate),
         profit_margin: Number(formData.profit_margin),
@@ -64,10 +79,19 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
         profit_margin: 30,
         commission_rate: 5,
       });
+      setFieldErrors({});
       setIsCategoryLeaf(false);
     } catch (error: any) {
       console.error('Error creando producto rápido:', error);
-      alert(error.response?.data?.error || 'No se pudo crear el producto.');
+      const status = error.response?.status;
+      const backendError = error.response?.data?.error || 'No se pudo crear el producto.';
+      const conflictField = error.response?.data?.field as 'sku' | 'name' | undefined;
+
+      if (status === 409 && conflictField) {
+        setFieldErrors({ [conflictField]: backendError });
+      } else {
+        setFieldErrors({ general: backendError });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -92,6 +116,13 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {fieldErrors.general && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2 text-rose-700 text-xs font-semibold">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{fieldErrors.general}</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -103,9 +134,16 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
                 required
                 value={formData.sku}
                 onChange={handleChange}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm font-mono"
+                className={`w-full border rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 shadow-sm font-mono ${
+                  fieldErrors.sku
+                    ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-200 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6]'
+                }`}
                 placeholder="Ej. TAZA-B-01"
               />
+              {fieldErrors.sku && (
+                <p className="mt-1 text-[11px] font-semibold text-rose-600">{fieldErrors.sku}</p>
+              )}
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -117,9 +155,16 @@ export const QuickProductModal = ({ isOpen, onClose, onSuccess }: QuickProductMo
                 required
                 value={formData.name}
                 onChange={handleChange}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm"
+                className={`w-full border rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 shadow-sm ${
+                  fieldErrors.name
+                    ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                    : 'border-slate-200 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6]'
+                }`}
                 placeholder="Taza Blanca"
               />
+              {fieldErrors.name && (
+                <p className="mt-1 text-[11px] font-semibold text-rose-600">{fieldErrors.name}</p>
+              )}
             </div>
           </div>
 

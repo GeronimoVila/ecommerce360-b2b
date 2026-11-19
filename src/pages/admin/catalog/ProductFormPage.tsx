@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, DollarSign, Percent, BarChart3 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Percent, BarChart3, AlertCircle } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
 import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 import { ProductImageUploader } from '../../../components/admin/catalog/ProductImageUploader';
 import type { ProductImage } from '../../../types/product';
+
+interface FieldErrors {
+  sku?: string;
+  name?: string;
+  general?: string;
+}
 
 export const ProductFormPage = () => {
   const { id } = useParams();
@@ -23,6 +29,7 @@ export const ProductFormPage = () => {
     commission_rate: 0,
   });
 
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [images, setImages] = useState<ProductImage[]>([]);
   const [sessionDraftIds, setSessionDraftIds] = useState<string[]>([]);
   const [hadInitialImages, setHadInitialImages] = useState(false);
@@ -56,7 +63,9 @@ export const ProductFormPage = () => {
         })
         .catch((err) => {
           console.error('Error hidratando datos:', err);
-          alert(err.response?.data?.error || 'No se pudieron cargar los datos del producto.');
+          setFieldErrors({
+            general: err.response?.data?.error || 'No se pudieron cargar los datos del producto.',
+          });
         })
         .finally(() => setIsLoadingProduct(false));
     }
@@ -74,6 +83,11 @@ export const ProductFormPage = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
+
+    if (name === 'sku' || name === 'name') {
+      setFieldErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
+    }
+
     setFormData((prev: any) => ({
       ...prev,
       [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value,
@@ -81,31 +95,32 @@ export const ProductFormPage = () => {
   };
 
   const validatePayload = (): boolean => {
+    const errors: FieldErrors = {};
+
     if (!formData.sku || formData.sku.trim() === '') {
-      alert('El SKU es obligatorio.');
-      return false;
+      errors.sku = 'El SKU es obligatorio.';
     }
     if (!formData.name || formData.name.trim() === '') {
-      alert('El nombre del producto es obligatorio.');
-      return false;
+      errors.name = 'El nombre del producto es obligatorio.';
     }
     if (!formData.category_id || !isCategoryLeaf) {
-      alert('Debes seleccionar una subcategoría final (hoja) válida.');
-      return false;
+      errors.general = 'Debes seleccionar una subcategoría final (hoja) válida.';
     }
 
     const numericFields = ['purchase_cost', 'vat_rate', 'profit_margin', 'commission_rate', 'physical_stock'];
     for (const field of numericFields) {
       if (formData[field] === '' || formData[field] === null || formData[field] === undefined) {
-        alert(`El campo ${field} no puede estar vacío.`);
-        return false;
+        errors.general = `El campo ${field} no puede estar vacío.`;
+        break;
       }
       if (Number(formData[field]) < 0) {
-        alert(`El campo ${field} no puede ser un valor negativo.`);
-        return false;
+        errors.general = `El campo ${field} no puede ser un valor negativo.`;
+        break;
       }
     }
-    return true;
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleCancel = async () => {
@@ -127,10 +142,11 @@ export const ProductFormPage = () => {
     if (!validatePayload() || isUploadingImages || isCanceling) return;
 
     setIsSubmitting(true);
+    setFieldErrors({});
 
     const sanitizedPayload = {
-      sku: formData.sku,
-      name: formData.name,
+      sku: formData.sku.trim().toUpperCase(),
+      name: formData.name.trim(),
       category_id: formData.category_id,
       purchase_cost: Number(formData.purchase_cost),
       vat_rate: Number(formData.vat_rate),
@@ -154,7 +170,7 @@ export const ProductFormPage = () => {
           targetProductId,
           images.map((img) => ({
             id: img.id,
-            alt_text: img.alt_text || formData.name,
+            alt_text: img.alt_text || sanitizedPayload.name,
             is_primary: img.is_primary,
           }))
         );
@@ -163,7 +179,15 @@ export const ProductFormPage = () => {
       navigate('/admin/catalog');
     } catch (error: any) {
       console.error('[Arquitectura] Error de red/backend:', error);
-      alert(error.response?.data?.error || 'Hubo un error al guardar el producto.');
+      const status = error.response?.status;
+      const backendError = error.response?.data?.error || 'Hubo un error al guardar el producto.';
+      const conflictField = error.response?.data?.field as 'sku' | 'name' | undefined;
+
+      if (status === 409 && conflictField) {
+        setFieldErrors({ [conflictField]: backendError });
+      } else {
+        setFieldErrors({ general: backendError });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -200,6 +224,13 @@ export const ProductFormPage = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+        {fieldErrors.general && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-rose-700 text-sm font-medium">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{fieldErrors.general}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
@@ -213,8 +244,18 @@ export const ProductFormPage = () => {
               required
               disabled={isEditMode}
               placeholder="Ej. PROD-REF-001"
-              className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 disabled:text-slate-500 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm"
+              className={`mt-1 block w-full border rounded-xl p-3 bg-white text-slate-900 disabled:bg-slate-100 disabled:text-slate-500 focus:ring-2 transition-colors text-sm shadow-sm font-mono ${
+                fieldErrors.sku
+                  ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                  : 'border-slate-200 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6]'
+              }`}
             />
+            {fieldErrors.sku && (
+              <p className="mt-1.5 text-xs font-semibold text-rose-600 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {fieldErrors.sku}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
@@ -227,8 +268,18 @@ export const ProductFormPage = () => {
               onChange={handleChange}
               required
               placeholder="Ej. Heladera No Frost Inverter"
-              className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm"
+              className={`mt-1 block w-full border rounded-xl p-3 bg-white text-slate-900 focus:ring-2 transition-colors text-sm shadow-sm ${
+                fieldErrors.name
+                  ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                  : 'border-slate-200 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6]'
+              }`}
             />
+            {fieldErrors.name && (
+              <p className="mt-1.5 text-xs font-semibold text-rose-600 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
         </div>
 
