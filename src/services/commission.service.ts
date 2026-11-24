@@ -28,4 +28,17 @@ export const CommissionService = {
     const response = await apiClient.get('/commissions/my-payouts');
     return response.data.data;
   },
+
+  requestPayout: async (): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      available_amount: number;
+      commissions_count: number;
+      cbu_alias: string;
+    };
+  }> => {
+    const response = await apiClient.post('/commissions/request-payout');
+    return response.data;
+  },
 };

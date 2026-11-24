@@ -10,6 +10,7 @@ import {
   Landmark,
   Receipt,
   Filter,
+  Send,
 } from 'lucide-react';
 import { CommissionService } from '../../../services/commission.service';
 import type {
@@ -62,6 +63,8 @@ export default function SellerCommissionsPage() {
 
   const [loading, setLoading] = useState(true);
   const [filtering, setFiltering] = useState(false);
+  const [requestingPayout, setRequestingPayout] = useState(false);
+  const [payoutSuccessMsg, setPayoutSuccessMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadInitialData = useCallback(async () => {
@@ -113,6 +116,33 @@ export default function SellerCommissionsPage() {
     }
   };
 
+  const handleRequestPayout = async () => {
+    if (!summary?.cbu_alias || (summary?.available_balance ?? 0) <= 0) return;
+
+    const confirmed = window.confirm(
+      `¿Confirmas notificar a Administración para solicitar el retiro de $${summary.available_balance.toLocaleString(
+        'es-AR'
+      )} ARS hacia tu cuenta "${summary.cbu_alias}"?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setRequestingPayout(true);
+      setError(null);
+      setPayoutSuccessMsg(null);
+
+      const res = await CommissionService.requestPayout();
+      setPayoutSuccessMsg(res.message);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.error ||
+          'No se pudo enviar la solicitud de retiro.'
+      );
+    } finally {
+      setRequestingPayout(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-16 flex justify-center bg-[#F8FAFC] min-h-screen items-center">
@@ -124,6 +154,7 @@ export default function SellerCommissionsPage() {
   const availableBalance = summary?.available_balance ?? 0;
   const pendingBalance = summary?.pending_clearance_balance ?? 0;
   const liquidatedTotal = summary?.liquidated_total ?? 0;
+  const canRequestPayout = availableBalance > 0 && Boolean(summary?.cbu_alias);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 bg-[#F8FAFC] min-h-screen font-sans text-slate-900">
@@ -178,6 +209,13 @@ export default function SellerCommissionsPage() {
         </div>
       )}
 
+      {payoutSuccessMsg && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2.5">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span>{payoutSuccessMsg}</span>
+        </div>
+      )}
+
       {error && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
           <AlertCircle className="w-5 h-5 shrink-0" />
@@ -186,23 +224,50 @@ export default function SellerCommissionsPage() {
       )}
 
       <div className="bg-[#1A1D27] rounded-2xl p-6 md:p-8 text-white shadow-lg grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="border-b md:border-b-0 md:border-r border-slate-700/80 pb-5 md:pb-0 md:pr-6">
-          <div className="flex items-center gap-2 text-emerald-400 mb-2">
-            <Wallet className="w-4 h-4" />
-            <span className="text-[11px] font-bold uppercase tracking-wider">
-              Disponible para Liquidar
-            </span>
+        <div className="border-b md:border-b-0 md:border-r border-slate-700/80 pb-5 md:pb-0 md:pr-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-emerald-400 mb-2">
+              <Wallet className="w-4 h-4" />
+              <span className="text-[11px] font-bold uppercase tracking-wider">
+                Disponible para Liquidar
+              </span>
+            </div>
+            <div className="flex items-end gap-2">
+              <h2 className="text-3xl lg:text-4xl font-black text-emerald-400 font-mono">
+                ${availableBalance.toLocaleString('es-AR')}
+              </h2>
+              <span className="text-emerald-400/80 font-bold mb-1 text-xs">ARS</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              {summary?.counts.available ?? 0}{' '}
+              {summary?.counts.available === 1 ? 'comisión lista' : 'comisiones listas'} para transferencia
+            </p>
           </div>
-          <div className="flex items-end gap-2">
-            <h2 className="text-3xl lg:text-4xl font-black text-emerald-400 font-mono">
-              ${availableBalance.toLocaleString('es-AR')}
-            </h2>
-            <span className="text-emerald-400/80 font-bold mb-1 text-xs">ARS</span>
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleRequestPayout}
+              disabled={!canRequestPayout || requestingPayout || Boolean(payoutSuccessMsg)}
+              title={
+                !summary?.cbu_alias
+                  ? 'Configura tu CBU o Alias en Mi Perfil para habilitar retiros'
+                  : availableBalance <= 0
+                  ? 'No tienes saldo disponible para retirar'
+                  : 'Notificar a Administración para liquidar tu saldo disponible'
+              }
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>
+                {requestingPayout
+                  ? 'Enviando solicitud...'
+                  : payoutSuccessMsg
+                  ? 'Solicitud Enviada'
+                  : 'Solicitar Liquidación'}
+              </span>
+            </button>
           </div>
-          <p className="text-xs text-slate-400 mt-2">
-            {summary?.counts.available ?? 0}{' '}
-            {summary?.counts.available === 1 ? 'comisión lista' : 'comisiones listas'} para transferencia
-          </p>
         </div>
 
         <div className="border-b md:border-b-0 md:border-r border-slate-700/80 pb-5 md:pb-0 md:px-4">

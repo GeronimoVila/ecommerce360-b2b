@@ -10,6 +10,7 @@ import {
   Store,
   UserCheck,
   AlertCircle,
+  AlertTriangle,
   X,
   Package,
   MapPin,
@@ -89,6 +90,7 @@ export const SalesManagementPage = () => {
   const [sellers, setSellers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   const [searchInput, setSearchInput] = useState('');
@@ -103,6 +105,10 @@ export const SalesManagementPage = () => {
   const limit = 15;
 
   const [selectedOrder, setSelectedOrder] = useState<ManageableOrder | null>(null);
+
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
+  const [issueReason, setIssueReason] = useState('');
+  const [isReportingIssue, setIsReportingIssue] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -163,6 +169,7 @@ export const SalesManagementPage = () => {
 
     setUpdatingOrderId(order.id);
     setErrorMsg(null);
+    setSuccessMsg(null);
 
     try {
       const res = await OrderService.updateOrderStatus(order.id, nextStatus);
@@ -195,6 +202,28 @@ export const SalesManagementPage = () => {
       setErrorMsg(error.response?.data?.error || 'No se pudo actualizar el estado de la orden.');
     } finally {
       setUpdatingOrderId(null);
+    }
+  };
+
+  const handleSubmitShippingIssue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrder || !issueReason.trim()) return;
+
+    try {
+      setIsReportingIssue(true);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+
+      const res = await OrderService.reportShippingIssue(selectedOrder.id, issueReason.trim());
+      setSuccessMsg(res.message);
+      setIssueReason('');
+      setIsIssueModalOpen(false);
+    } catch (error: any) {
+      setErrorMsg(
+        error.response?.data?.error || 'No se pudo registrar la incidencia logística.'
+      );
+    } finally {
+      setIsReportingIssue(false);
     }
   };
 
@@ -288,6 +317,22 @@ export const SalesManagementPage = () => {
           <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{deliveredCount}</p>
         </div>
       </div>
+
+      {successMsg && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{successMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMsg(null)}
+            className="text-emerald-600 hover:text-emerald-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {errorMsg && (
         <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2">
@@ -652,19 +697,35 @@ export const SalesManagementPage = () => {
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
-                <MapPin className="w-4 h-4 text-[#5B50D6] shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Destino de Entrega
-                  </p>
-                  <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                    {formatShippingAddress(
-                      selectedOrder.shipping_address,
-                      selectedOrder.shipping_cp
-                    )}
-                  </p>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="w-4 h-4 text-[#5B50D6] shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Destino de Entrega
+                    </p>
+                    <p className="text-xs font-semibold text-slate-700 mt-0.5">
+                      {formatShippingAddress(
+                        selectedOrder.shipping_address,
+                        selectedOrder.shipping_cp
+                      )}
+                    </p>
+                  </div>
                 </div>
+
+                {isAdmin && (selectedOrder.status === 'PAID' || selectedOrder.status === 'SHIPPED') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIssueReason('');
+                      setIsIssueModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors shrink-0"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Reportar Incidencia</span>
+                  </button>
+                )}
               </div>
 
               {selectedOrder.commission && (
@@ -777,6 +838,68 @@ export const SalesManagementPage = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {isIssueModalOpen && selectedOrder && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <form
+            onSubmit={handleSubmitShippingIssue}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-slate-100 bg-rose-50/70 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-rose-700">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="text-base font-extrabold">
+                  Incidencia Logística #ORD-{selectedOrder.order_number}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsIssueModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Este aviso quedará registrado en el historial de la orden y enviará una notificación inmediata al cliente (<strong>{selectedOrder.customer.name}</strong>) en su portal de compras.
+              </p>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Motivo de la incidencia *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={issueReason}
+                  onChange={(e) => setIssueReason(e.target.value)}
+                  placeholder="Ej: Domicilio cerrado en primer intento de visita. Se reprograma entrega para mañana."
+                  className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsIssueModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isReportingIssue || !issueReason.trim()}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm disabled:opacity-50"
+              >
+                {isReportingIssue ? 'Enviando aviso...' : 'Notificar al Cliente'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

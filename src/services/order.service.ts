@@ -43,4 +43,15 @@ export const OrderService = {
     const response = await apiClient.patch(`orders/${orderId}/status`, { status });
     return response.data;
   },
+
+  reportShippingIssue: async (
+    orderId: string,
+    reason: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+  }> => {
+    const response = await apiClient.post(`orders/${orderId}/shipping-issue`, { reason });
+    return response.data;
+  },
 };
