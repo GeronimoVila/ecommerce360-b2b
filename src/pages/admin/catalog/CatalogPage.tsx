@@ -18,6 +18,26 @@ const getPrimaryImageUrl = (product: Product): string | null => {
   return primary?.url || null;
 };
 
+const getEffectiveStock = (product: Product): number => {
+  if (product.is_combo && Array.isArray(product.combo_parts) && product.combo_parts.length > 0) {
+    const hasStockData = product.combo_parts.every(
+      (cp) => typeof cp.product?.physical_stock === 'number'
+    );
+    if (hasStockData) {
+      let minCombos = Infinity;
+      for (const cp of product.combo_parts) {
+        const qty = Number(cp.quantity) || 0;
+        if (qty <= 0) continue;
+        const partStock = Number(cp.product.physical_stock) || 0;
+        const possible = Math.floor(partStock / qty);
+        if (possible < minCombos) minCombos = possible;
+      }
+      return minCombos === Infinity ? 0 : minCombos;
+    }
+  }
+  return Number(product.physical_stock) || 0;
+};
+
 export const CatalogPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,10 +91,11 @@ export const CatalogPage = () => {
   };
 
   const filteredProducts = products.filter((p) => {
+    const stock = getEffectiveStock(p);
     if (activeFilter === 'ACTIVE' && !p.is_active) return false;
     if (activeFilter === 'INACTIVE' && p.is_active) return false;
-    if (stockFilter === 'LOW_STOCK' && p.physical_stock > 5) return false;
-    if (stockFilter === 'IN_STOCK' && p.physical_stock <= 5) return false;
+    if (stockFilter === 'LOW_STOCK' && stock > 5) return false;
+    if (stockFilter === 'IN_STOCK' && stock <= 5) return false;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       const matchesName = p.name.toLowerCase().includes(term);
@@ -269,6 +290,13 @@ export const CatalogPage = () => {
           <div className="md:hidden space-y-4">
             {filteredProducts.map((p: Product) => {
               const thumbUrl = getPrimaryImageUrl(p);
+              const effectiveStock = getEffectiveStock(p);
+              const unitLabel = p.is_combo
+                ? effectiveStock === 1
+                  ? 'combo armable'
+                  : 'combos armables'
+                : 'unidades';
+
               return (
                 <div key={p.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex justify-between items-start mb-4">
@@ -297,6 +325,13 @@ export const CatalogPage = () => {
                             {p.category?.name || 'Sin categoría'}
                           </span>
                         </div>
+                        {p.is_combo && p.combo_parts && p.combo_parts.length > 0 && (
+                          <p className="text-[11px] text-slate-500 mt-1.5">
+                            {p.combo_parts
+                              .map((cp) => `${cp.quantity}x ${cp.product.name} (${cp.product.physical_stock ?? 0} disp.)`)
+                              .join(' · ')}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -308,8 +343,8 @@ export const CatalogPage = () => {
                     </div>
                     <div>
                       <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Stock</p>
-                      <p className={`font-bold ${p.physical_stock <= 5 ? 'text-red-600' : 'text-emerald-600'}`}>
-                        {p.physical_stock} unidades
+                      <p className={`font-bold ${effectiveStock <= 5 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {effectiveStock} {unitLabel}
                       </p>
                     </div>
                   </div>
@@ -348,7 +383,7 @@ export const CatalogPage = () => {
                   <th className="px-6 py-4">Producto & SKU</th>
                   <th className="px-6 py-4">Categoría</th>
                   <th className="px-6 py-4">Precio Mayorista (B2B)</th>
-                  <th className="px-6 py-4 w-48">Disponibilidad & Stock</th>
+                  <th className="px-6 py-4 w-56">Disponibilidad & Stock</th>
                   <th className="px-6 py-4">Estado</th>
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
@@ -356,13 +391,19 @@ export const CatalogPage = () => {
               <tbody className="divide-y divide-slate-100 text-sm">
                 {filteredProducts.map((p: Product) => {
                   const thumbUrl = getPrimaryImageUrl(p);
-                  const isCritical = p.physical_stock <= 5;
-                  const stockPercentage = Math.min((p.physical_stock / 50) * 100, 100);
+                  const effectiveStock = getEffectiveStock(p);
+                  const isCritical = effectiveStock <= 5;
+                  const stockPercentage = Math.min((effectiveStock / 50) * 100, 100);
                   const marginPercentage =
                     p.base_price > 0
                       ? (((p.base_price - p.purchase_cost) / p.base_price) * 100).toFixed(0)
                       : 0;
                   const marginAbsolute = p.base_price - p.purchase_cost;
+                  const unitLabel = p.is_combo
+                    ? effectiveStock === 1
+                      ? 'combo armable'
+                      : 'combos armables'
+                    : 'unidades';
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/50 transition-colors bg-white group">
@@ -382,11 +423,11 @@ export const CatalogPage = () => {
                               <Box className="w-5 h-5 text-slate-400" />
                             )}
                           </div>
-                          <div>
-                            <p className="font-bold text-slate-900 text-sm max-w-50 leading-tight truncate">
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 text-sm max-w-64 leading-tight truncate">
                               {p.name}
                             </p>
-                            <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex items-center gap-2 mt-1">
                               <span className="text-[10px] text-slate-500 font-mono">SKU: {p.sku}</span>
                               {p.images && p.images.length > 1 && (
                                 <span className="text-[10px] text-slate-400 font-medium">
@@ -394,6 +435,18 @@ export const CatalogPage = () => {
                                 </span>
                               )}
                             </div>
+                            {p.is_combo && p.combo_parts && p.combo_parts.length > 0 && (
+                              <p
+                                className="text-[11px] text-slate-500 mt-1 max-w-72 truncate"
+                                title={p.combo_parts
+                                  .map((cp) => `${cp.quantity}x ${cp.product.name} (${cp.product.physical_stock ?? 0} en stock)`)
+                                  .join(' | ')}
+                              >
+                                {p.combo_parts
+                                  .map((cp) => `${cp.quantity}x ${cp.product.name} (${cp.product.physical_stock ?? 0})`)
+                                  .join(' · ')}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -419,12 +472,12 @@ export const CatalogPage = () => {
                       </td>
 
                       <td className="px-6 py-4">
-                        <div className="flex justify-between items-end mb-1.5">
+                        <div className="flex justify-between items-end mb-1.5 gap-2">
                           <span className={`text-xs font-bold ${isCritical ? 'text-red-600' : 'text-emerald-600'}`}>
-                            {p.physical_stock} unidades
+                            {effectiveStock} {unitLabel}
                           </span>
                           <span
-                            className={`text-[9px] font-bold uppercase ${
+                            className={`text-[9px] font-bold uppercase shrink-0 ${
                               isCritical ? 'text-red-400 bg-red-50 px-1.5 rounded' : 'text-emerald-400'
                             }`}
                           >

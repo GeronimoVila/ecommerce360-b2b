@@ -1,4 +1,4 @@
-export type OrderStatus = 'PENDING' | 'BUDGET' | 'PAID' | 'SHIPPED' | 'DELIVERED';
+export type OrderStatus = 'PENDING' | 'BUDGET' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELED';
 export type OrderAttributionType = 'SELLER' | 'DIRECT';
 export type PaymentMethod = 'MP' | 'MOBBEX' | 'TRANSFERENCIA';
 

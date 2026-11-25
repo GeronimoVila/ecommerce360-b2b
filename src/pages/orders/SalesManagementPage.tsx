@@ -12,6 +12,7 @@ import {
   AlertCircle,
   AlertTriangle,
   X,
+  XCircle,
   Package,
   MapPin,
   CreditCard,
@@ -66,6 +67,13 @@ const STATUS_META: Record<
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     dotClass: 'bg-emerald-500',
     buttonClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+  },
+  CANCELED: {
+    label: 'Cancelada',
+    actionLabel: 'Cancelar',
+    badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+    dotClass: 'bg-rose-500',
+    buttonClass: 'bg-rose-600 hover:bg-rose-700 text-white',
   },
 };
 
@@ -138,9 +146,9 @@ export const SalesManagementPage = () => {
         search: debouncedSearch,
       });
 
-      setOrders(response.data);
-      setTotalPages(response.meta.totalPages || 1);
-      setTotalCount(response.meta.total || 0);
+      setOrders(Array.isArray(response?.data) ? response.data : []);
+      setTotalPages(response?.meta?.totalPages || 1);
+      setTotalCount(response?.meta?.total || 0);
     } catch (error: any) {
       console.error('[SalesManagementPage] Error cargando órdenes:', error);
       setErrorMsg(error.response?.data?.error || 'No se pudieron cargar las ventas.');
@@ -157,8 +165,12 @@ export const SalesManagementPage = () => {
     if (nextStatus === order.status) return;
 
     const targetMeta = STATUS_META[nextStatus];
+    if (!targetMeta) return;
+
     const extraNote =
-      order.status === 'PAID' && nextStatus === 'DELIVERED'
+      nextStatus === 'CANCELED'
+        ? ' (Se repondrá el stock y se revertirá la comisión si corresponde)'
+        : order.status === 'PAID' && nextStatus === 'DELIVERED'
         ? ' (Entrega directa / retiro sin envío)'
         : '';
 
@@ -180,7 +192,7 @@ export const SalesManagementPage = () => {
             ? {
                 ...item,
                 status: res.data.status,
-                allowed_next_statuses: res.data.allowed_next_statuses,
+                allowed_next_statuses: res.data.allowed_next_statuses || [],
               }
             : item
         )
@@ -192,7 +204,7 @@ export const SalesManagementPage = () => {
             ? {
                 ...prev,
                 status: res.data.status,
-                allowed_next_statuses: res.data.allowed_next_statuses,
+                allowed_next_statuses: res.data.allowed_next_statuses || [],
               }
             : null
         );
@@ -259,6 +271,7 @@ export const SalesManagementPage = () => {
   const renderStatusIcon = (status: OrderStatus) => {
     if (status === 'SHIPPED') return <Truck className="w-3.5 h-3.5" />;
     if (status === 'DELIVERED') return <CheckCircle2 className="w-3.5 h-3.5" />;
+    if (status === 'CANCELED') return <XCircle className="w-3.5 h-3.5" />;
     return <RotateCcw className="w-3.5 h-3.5" />;
   };
 
@@ -378,6 +391,7 @@ export const SalesManagementPage = () => {
             <option value="DELIVERED">Entregada</option>
             {isAdmin && <option value="PENDING">Pendiente de Pago</option>}
             {isAdmin && <option value="BUDGET">Presupuesto</option>}
+            {isAdmin && <option value="CANCELED">Cancelada</option>}
           </select>
         </div>
 
@@ -477,7 +491,7 @@ export const SalesManagementPage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {orders.map((order) => {
-                  const statusInfo = STATUS_META[order.status];
+                  const statusInfo = STATUS_META[order.status] || STATUS_META.PENDING;
                   const isUpdating = updatingOrderId === order.id;
 
                   return (
@@ -498,9 +512,9 @@ export const SalesManagementPage = () => {
                       </td>
 
                       <td className="py-4 px-5">
-                        <div className="font-bold text-slate-800">{order.customer.name}</div>
+                        <div className="font-bold text-slate-800">{order.customer?.name || 'Cliente'}</div>
                         <div className="text-xs text-slate-400 mt-0.5">
-                          {order.customer.email || order.customer.phone || 'Sin contacto'}
+                          {order.customer?.email || order.customer?.phone || 'Sin contacto'}
                         </div>
                       </td>
 
@@ -559,8 +573,9 @@ export const SalesManagementPage = () => {
 
                       <td className="py-4 px-5 text-right whitespace-nowrap">
                         <div className="inline-flex items-center justify-end gap-1.5">
-                          {order.allowed_next_statuses.map((nextStatus) => {
+                          {(order.allowed_next_statuses || []).map((nextStatus) => {
                             const nextMeta = STATUS_META[nextStatus];
+                            if (!nextMeta) return null;
                             return (
                               <button
                                 key={nextStatus}
@@ -637,10 +652,10 @@ export const SalesManagementPage = () => {
                   </h2>
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold border ${
-                      STATUS_META[selectedOrder.status].badgeClass
+                      (STATUS_META[selectedOrder.status] || STATUS_META.PENDING).badgeClass
                     }`}
                   >
-                    {STATUS_META[selectedOrder.status].label}
+                    {(STATUS_META[selectedOrder.status] || STATUS_META.PENDING).label}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -662,11 +677,11 @@ export const SalesManagementPage = () => {
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     Cliente
                   </p>
-                  <p className="text-sm font-bold text-slate-900">{selectedOrder.customer.name}</p>
-                  {selectedOrder.customer.email && (
+                  <p className="text-sm font-bold text-slate-900">{selectedOrder.customer?.name || 'Cliente'}</p>
+                  {selectedOrder.customer?.email && (
                     <p className="text-xs text-slate-600">{selectedOrder.customer.email}</p>
                   )}
-                  {selectedOrder.customer.phone && (
+                  {selectedOrder.customer?.phone && (
                     <p className="text-xs text-slate-600 font-mono">
                       Tel: {selectedOrder.customer.phone}
                     </p>
@@ -807,13 +822,14 @@ export const SalesManagementPage = () => {
                 Cerrar
               </button>
 
-              {selectedOrder.allowed_next_statuses.length > 0 && (
+              {(selectedOrder.allowed_next_statuses || []).length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500 mr-1">
                     Cambiar estado a:
                   </span>
-                  {selectedOrder.allowed_next_statuses.map((nextStatus) => {
+                  {(selectedOrder.allowed_next_statuses || []).map((nextStatus) => {
                     const nextMeta = STATUS_META[nextStatus];
+                    if (!nextMeta) return null;
                     const isUpdating = updatingOrderId === selectedOrder.id;
                     return (
                       <button
@@ -865,7 +881,7 @@ export const SalesManagementPage = () => {
 
             <div className="p-6 space-y-4">
               <p className="text-xs text-slate-600 leading-relaxed">
-                Este aviso quedará registrado en el historial de la orden y enviará una notificación inmediata al cliente (<strong>{selectedOrder.customer.name}</strong>) en su portal de compras.
+                Este aviso quedará registrado en el historial de la orden y enviará una notificación inmediata al cliente (<strong>{selectedOrder.customer?.name || 'Cliente'}</strong>) en su portal de compras.
               </p>
 
               <div>

@@ -13,6 +13,19 @@ interface FieldErrors {
   general?: string;
 }
 
+const computeFinalPrice = (cost: number, vat: number, margin: number): number => {
+  const costWithVat = cost * (1 + vat / 100);
+  const rawFinal = costWithVat * (1 + margin / 100);
+  return Math.round(rawFinal * 100) / 100;
+};
+
+const computeMarginFromFinalPrice = (cost: number, vat: number, finalPrice: number): number => {
+  const costWithVat = cost * (1 + vat / 100);
+  if (costWithVat <= 0) return 0;
+  const rawMargin = (finalPrice / costWithVat - 1) * 100;
+  return Number(rawMargin.toFixed(6));
+};
+
 export const ProductFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,6 +42,7 @@ export const ProductFormPage = () => {
     commission_rate: 0,
   });
 
+  const [finalPriceInput, setFinalPriceInput] = useState<number | ''>(0);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [images, setImages] = useState<ProductImage[]>([]);
   const [sessionDraftIds, setSessionDraftIds] = useState<string[]>([]);
@@ -37,7 +51,6 @@ export const ProductFormPage = () => {
   const [isCanceling, setIsCanceling] = useState(false);
 
   const [isCategoryLeaf, setIsCategoryLeaf] = useState(false);
-  const [calculatedPrice, setCalculatedPrice] = useState(0);
   const [isLoadingProduct, setIsLoadingProduct] = useState(isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -46,16 +59,22 @@ export const ProductFormPage = () => {
       setIsLoadingProduct(true);
       ProductService.getById(id)
         .then((product: any) => {
+          const cost = Number(product.purchase_cost ?? 0);
+          const vat = Number(product.vat_rate ?? 21);
+          const margin = Number(product.profit_margin ?? 0);
+
           setFormData({
             sku: product.sku || '',
             name: product.name || '',
             category_id: product.category_id || product.category?.id || '',
-            purchase_cost: Number(product.purchase_cost ?? 0),
-            vat_rate: Number(product.vat_rate ?? 21),
-            profit_margin: Number(product.profit_margin ?? 0),
+            purchase_cost: cost,
+            vat_rate: vat,
+            profit_margin: margin,
             physical_stock: Number(product.physical_stock ?? 0),
             commission_rate: Number(product.commission_rate ?? 0),
           });
+
+          setFinalPriceInput(computeFinalPrice(cost, vat, margin));
 
           const existingImages: ProductImage[] = Array.isArray(product.images) ? product.images : [];
           setImages(existingImages);
@@ -71,16 +90,6 @@ export const ProductFormPage = () => {
     }
   }, [id, isEditMode]);
 
-  useEffect(() => {
-    const cost = Number(formData.purchase_cost) || 0;
-    const vat = Number(formData.vat_rate) || 0;
-    const margin = Number(formData.profit_margin) || 0;
-
-    const costWithVat = cost * (1 + vat / 100);
-    const finalPrice = costWithVat * (1 + margin / 100);
-    setCalculatedPrice(finalPrice);
-  }, [formData.purchase_cost, formData.vat_rate, formData.profit_margin]);
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
 
@@ -88,9 +97,45 @@ export const ProductFormPage = () => {
       setFieldErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
     }
 
+    const parsedValue = type === 'number' ? (value === '' ? '' : Number(value)) : value;
+
+    setFormData((prev: any) => {
+      const updated = {
+        ...prev,
+        [name]: parsedValue,
+      };
+
+      if (name === 'purchase_cost' || name === 'vat_rate' || name === 'profit_margin') {
+        const cost = Number(updated.purchase_cost) || 0;
+        const vat = Number(updated.vat_rate) || 0;
+        const margin = Number(updated.profit_margin) || 0;
+        setFinalPriceInput(computeFinalPrice(cost, vat, margin));
+      }
+
+      return updated;
+    });
+  };
+
+  const handleFinalPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setFieldErrors((prev) => ({ ...prev, general: undefined }));
+
+    if (raw === '') {
+      setFinalPriceInput('');
+      setFormData((prev: any) => ({ ...prev, profit_margin: 0 }));
+      return;
+    }
+
+    const numericFinalPrice = Number(raw);
+    setFinalPriceInput(numericFinalPrice);
+
+    const cost = Number(formData.purchase_cost) || 0;
+    const vat = Number(formData.vat_rate) || 0;
+    const equivalentMargin = computeMarginFromFinalPrice(cost, vat, numericFinalPrice);
+
     setFormData((prev: any) => ({
       ...prev,
-      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value,
+      profit_margin: equivalentMargin,
     }));
   };
 
@@ -107,8 +152,21 @@ export const ProductFormPage = () => {
       errors.general = 'Debes seleccionar una subcategoría final (hoja) válida.';
     }
 
+    const cost = Number(formData.purchase_cost) || 0;
+    const vat = Number(formData.vat_rate) || 0;
+    const costWithVat = cost * (1 + vat / 100);
+
+    if (finalPriceInput === '' || Number(finalPriceInput) < 0) {
+      errors.general = 'El precio final no puede estar vacío ni ser negativo.';
+    } else if (costWithVat > 0 && Number(finalPriceInput) < Math.round(costWithVat * 100) / 100) {
+      errors.general = `El precio final ($${Number(finalPriceInput).toFixed(2)}) no puede ser menor al costo con IVA ($${costWithVat.toFixed(2)}).`;
+    } else if (costWithVat === 0 && Number(finalPriceInput) > 0) {
+      errors.general = 'Debes ingresar un Costo de Compra mayor a $0 para calcular el margen equivalente.';
+    }
+
     const numericFields = ['purchase_cost', 'vat_rate', 'profit_margin', 'commission_rate', 'physical_stock'];
     for (const field of numericFields) {
+      if (errors.general) break;
       if (formData[field] === '' || formData[field] === null || formData[field] === undefined) {
         errors.general = `El campo ${field} no puede estar vacío.`;
         break;
@@ -202,6 +260,7 @@ export const ProductFormPage = () => {
   }
 
   const isSubmitDisabled = isSubmitting || isUploadingImages || isCanceling || !isCategoryLeaf;
+  const costWithVatPreview = (Number(formData.purchase_cost) || 0) * (1 + (Number(formData.vat_rate) || 0) / 100);
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
@@ -355,7 +414,7 @@ export const ProductFormPage = () => {
               <input
                 type="number"
                 name="profit_margin"
-                step="0.1"
+                step="any"
                 min="0"
                 value={formData.profit_margin}
                 onChange={handleChange}
@@ -366,16 +425,33 @@ export const ProductFormPage = () => {
           </div>
         </div>
 
-        <div className="bg-[#5B50D6]/5 border border-[#5B50D6]/20 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <div className="bg-[#5B50D6]/5 border border-[#5B50D6]/20 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <p className="text-sm text-[#5B50D6] font-bold">Precio Base Calculado</p>
+            <label
+              htmlFor="final_price_input"
+              className="block text-sm text-[#5B50D6] font-bold cursor-pointer"
+            >
+              Precio Base / Final ($)
+            </label>
             <p className="text-xs text-slate-500 mt-0.5">
-              Precio final proyectado aplicando IVA y margen comercial
+              Costo con IVA: <span className="font-mono font-semibold text-slate-700">${costWithVatPreview.toFixed(2)}</span> — Podés editar este monto para recalcular el margen automáticamente.
             </p>
           </div>
-          <p className="text-2xl md:text-3xl font-extrabold text-[#5B50D6] mt-2 sm:mt-0 font-mono">
-            ${calculatedPrice.toFixed(2)}
-          </p>
+          <div className="relative w-full sm:w-52">
+            <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-[#5B50D6] font-bold">
+              <DollarSign className="w-5 h-5" />
+            </span>
+            <input
+              id="final_price_input"
+              type="number"
+              step="any"
+              min="0"
+              value={finalPriceInput}
+              onChange={handleFinalPriceChange}
+              required
+              className="block w-full pl-10 pr-3 py-2.5 border border-[#5B50D6]/30 rounded-xl bg-white text-xl md:text-2xl font-extrabold text-[#5B50D6] text-right focus:ring-2 focus:ring-[#5B50D6]/30 focus:border-[#5B50D6] transition-colors font-mono shadow-xs"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-slate-100 pt-6">
@@ -386,7 +462,7 @@ export const ProductFormPage = () => {
             <input
               type="number"
               name="commission_rate"
-              step="0.1"
+              step="1"
               min="0"
               value={formData.commission_rate}
               onChange={handleChange}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Layers, Plus, Trash2, Box, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Layers, Plus, Trash2, Box, AlertCircle, DollarSign, BarChart3 } from 'lucide-react';
 import { ProductService } from '../../../services/product.service';
 import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
@@ -13,18 +13,38 @@ interface FieldErrors {
   general?: string;
 }
 
+const computeComboPriceFromMargin = (referenceTotal: number, marginPercent: number): number => {
+  const raw = referenceTotal * (1 + marginPercent / 100);
+  return Math.round(raw * 100) / 100;
+};
+
+const computeComboMarginFromPrice = (referenceTotal: number, finalPrice: number): number => {
+  if (referenceTotal <= 0) return 0;
+  const rawMargin = (finalPrice / referenceTotal - 1) * 100;
+  return Number(rawMargin.toFixed(4));
+};
+
 export const ComboFormPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    sku: string;
+    name: string;
+    category_id: string;
+    base_price: number | '';
+    commission_rate: number | '';
+  }>({
     sku: '',
     name: '',
     category_id: '',
     base_price: 0,
     commission_rate: 0,
   });
+
+  const [profitMarginInput, setProfitMarginInput] = useState<number | ''>(0);
+  const [lastEditedPricingField, setLastEditedPricingField] = useState<'price' | 'margin'>('price');
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -48,12 +68,13 @@ export const ComboFormPage = () => {
 
         if (isEditMode && id) {
           const comboData = await ProductService.getById(id);
+          const loadedBasePrice = Number(comboData.base_price) || 0;
 
           setFormData({
             sku: comboData.sku || '',
             name: comboData.name || '',
             category_id: comboData.category_id || comboData.category?.id || '',
-            base_price: Number(comboData.base_price) || 0,
+            base_price: loadedBasePrice,
             commission_rate: Number(comboData.commission_rate) || 0,
           });
 
@@ -63,6 +84,13 @@ export const ComboFormPage = () => {
               quantity: cp.quantity,
             }));
             setParts(mappedParts);
+
+            const initialRetailSum = mappedParts.reduce((acc: number, p: { sku: string; quantity: number }) => {
+              const prod = baseProducts.find((item) => item.sku === p.sku);
+              return acc + Number(prod?.base_price || 0) * p.quantity;
+            }, 0);
+
+            setProfitMarginInput(computeComboMarginFromPrice(initialRetailSum, loadedBasePrice));
           }
 
           const existingImages: ProductImage[] = Array.isArray(comboData.images) ? comboData.images : [];
@@ -81,10 +109,39 @@ export const ComboFormPage = () => {
     initForm();
   }, [id, isEditMode, navigate]);
 
-  const originalTotalValue = parts.reduce((acc, part) => {
+  const totalRetailValue = parts.reduce((acc, part) => {
     const product = availableProducts.find((p) => p.sku === part.sku);
-    return acc + Number(product?.purchase_cost || product?.base_price || 0) * part.quantity;
+    return acc + Number(product?.base_price || 0) * (Number(part.quantity) || 0);
   }, 0);
+
+  const totalPurchaseCost = parts.reduce((acc, part) => {
+    const product = availableProducts.find((p) => p.sku === part.sku);
+    return acc + Number(product?.purchase_cost || 0) * (Number(part.quantity) || 0);
+  }, 0);
+
+  useEffect(() => {
+    if (isLoadingInitialData) return;
+
+    if (totalRetailValue <= 0) {
+      if (lastEditedPricingField === 'margin') {
+        setFormData((prev) => ({ ...prev, base_price: 0 }));
+      } else {
+        setProfitMarginInput(0);
+      }
+      return;
+    }
+
+    if (lastEditedPricingField === 'margin') {
+      const margin = Number(profitMarginInput) || 0;
+      setFormData((prev) => ({
+        ...prev,
+        base_price: computeComboPriceFromMargin(totalRetailValue, margin),
+      }));
+    } else {
+      const currentPrice = Number(formData.base_price) || 0;
+      setProfitMarginInput(computeComboMarginFromPrice(totalRetailValue, currentPrice));
+    }
+  }, [totalRetailValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
@@ -96,6 +153,41 @@ export const ComboFormPage = () => {
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value,
+    }));
+  };
+
+  const handleFinalPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setLastEditedPricingField('price');
+    setFieldErrors((prev) => ({ ...prev, general: undefined }));
+
+    if (raw === '') {
+      setFormData((prev) => ({ ...prev, base_price: '' }));
+      setProfitMarginInput(0);
+      return;
+    }
+
+    const numericPrice = Number(raw);
+    setFormData((prev) => ({ ...prev, base_price: numericPrice }));
+    setProfitMarginInput(computeComboMarginFromPrice(totalRetailValue, numericPrice));
+  };
+
+  const handleProfitMarginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setLastEditedPricingField('margin');
+    setFieldErrors((prev) => ({ ...prev, general: undefined }));
+
+    if (raw === '') {
+      setProfitMarginInput('');
+      setFormData((prev) => ({ ...prev, base_price: 0 }));
+      return;
+    }
+
+    const numericMargin = Number(raw);
+    setProfitMarginInput(numericMargin);
+    setFormData((prev) => ({
+      ...prev,
+      base_price: computeComboPriceFromMargin(totalRetailValue, numericMargin),
     }));
   };
 
@@ -137,6 +229,10 @@ export const ComboFormPage = () => {
       errors.general = 'El combo debe tener al menos 1 producto componente.';
     } else if (parts.some((p) => p.sku === '' || p.quantity <= 0)) {
       errors.general = 'Verifica que todos los componentes tengan un producto seleccionado y cantidad mayor a 0.';
+    } else if (formData.base_price === '' || Number(formData.base_price) <= 0) {
+      errors.general = 'El precio final del combo debe ser mayor a $0.';
+    } else if (formData.commission_rate === '' || Number(formData.commission_rate) < 0) {
+      errors.general = 'La comisión de vendedor no puede ser negativa.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -203,6 +299,8 @@ export const ComboFormPage = () => {
   }
 
   const isSubmitDisabled = isSubmitting || isUploadingImages || isCanceling || !isCategoryLeaf;
+  const numericFinalPrice = Number(formData.base_price) || 0;
+  const priceDifference = numericFinalPrice - totalRetailValue;
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900">
@@ -329,79 +427,117 @@ export const ComboFormPage = () => {
                 No has añadido productos componentes a este combo.
               </div>
             ) : (
-              parts.map((part, index) => (
-                <div
-                  key={index}
-                  className="flex flex-col sm:flex-row gap-3 items-start sm:items-end p-4 bg-slate-50 border border-slate-200 rounded-xl"
-                >
-                  <div className="w-full sm:flex-1">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                      Producto
-                    </label>
-                    <select
-                      value={part.sku}
-                      onChange={(e) => updatePart(index, 'sku', e.target.value)}
-                      required
-                      className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm cursor-pointer"
-                    >
-                      <option value="" disabled>
-                        Selecciona un producto físico...
-                      </option>
-                      {availableProducts.map((p) => (
-                        <option key={p.id} value={p.sku}>
-                          {p.name} (${Number(p.base_price).toFixed(2)}) - SKU: {p.sku}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-full sm:w-28">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                      Cantidad
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={part.quantity}
-                      onChange={(e) => updatePart(index, 'quantity', Number(e.target.value))}
-                      className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 font-mono shadow-sm"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removePart(index)}
-                    className="w-full sm:w-auto mt-2 sm:mt-0 p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
-                    title="Eliminar componente"
+              parts.map((part, index) => {
+                const selectedProduct = availableProducts.find((p) => p.sku === part.sku);
+                const unitFinalPrice = Number(selectedProduct?.base_price || 0);
+                const partSubtotal = unitFinalPrice * (Number(part.quantity) || 0);
+
+                return (
+                  <div
+                    key={index}
+                    className="flex flex-col sm:flex-row gap-3 items-start sm:items-end p-4 bg-slate-50 border border-slate-200 rounded-xl"
                   >
-                    <Trash2 className="w-4 h-4" /> <span className="sm:hidden">Eliminar</span>
-                  </button>
-                </div>
-              ))
+                    <div className="w-full sm:flex-1">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        Producto
+                      </label>
+                      <select
+                        value={part.sku}
+                        onChange={(e) => updatePart(index, 'sku', e.target.value)}
+                        required
+                        className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm cursor-pointer"
+                      >
+                        <option value="" disabled>
+                          Selecciona un producto físico...
+                        </option>
+                        {availableProducts.map((p) => (
+                          <option key={p.id} value={p.sku}>
+                            {p.name} (${Number(p.base_price).toFixed(2)}) - SKU: {p.sku}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="w-full sm:w-24">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        Cantidad
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={part.quantity}
+                        onChange={(e) => updatePart(index, 'quantity', Number(e.target.value))}
+                        className="block w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 font-mono shadow-sm"
+                      />
+                    </div>
+
+                    <div className="w-full sm:w-40 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-right shadow-xs">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {selectedProduct ? `$${unitFinalPrice.toFixed(2)} c/u` : 'Subtotal línea'}
+                      </span>
+                      <span className="text-sm font-extrabold text-slate-800 font-mono">
+                        ${partSubtotal.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removePart(index)}
+                      className="w-full sm:w-auto mt-2 sm:mt-0 p-3 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 font-semibold text-xs transition-colors flex items-center justify-center gap-1"
+                      title="Eliminar componente"
+                    >
+                      <Trash2 className="w-4 h-4" /> <span className="sm:hidden">Eliminar</span>
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
 
-        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
+        <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+          <h2 className="text-base font-bold text-slate-900 pb-2 border-b border-slate-100">
             Precios y Comisiones
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Suma de precios finales de los productos
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Costo de compra total de componentes: <span className="font-mono font-semibold text-slate-700">${totalPurchaseCost.toFixed(2)}</span>
+              </p>
+            </div>
+            <p className="text-2xl font-extrabold text-slate-900 font-mono">
+              ${totalRetailValue.toFixed(2)}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                Precio Final del Combo ($) *
+                Margen / Variación (%) *
               </label>
-              <input
-                type="number"
-                name="base_price"
-                step="0.01"
-                min="0"
-                required
-                value={formData.base_price}
-                onChange={handleChange}
-                className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
-              />
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                  <BarChart3 className="w-4 h-4" />
+                </span>
+                <input
+                  type="number"
+                  step="any"
+                  value={profitMarginInput}
+                  onChange={handleProfitMarginChange}
+                  required
+                  className="mt-1 block w-full pl-9 pr-3 border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Usa valores negativos (ej. -10) para descuento sobre la suma.
+              </p>
             </div>
+
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                 Comisión Vendedor (%) *
@@ -417,29 +553,55 @@ export const ComboFormPage = () => {
                 className="mt-1 block w-full border border-slate-200 rounded-xl p-3 bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
               />
             </div>
+
+            <div>
+              <label
+                htmlFor="combo_final_price"
+                className="block text-xs font-bold uppercase tracking-wider text-[#5B50D6] mb-1.5 cursor-pointer"
+              >
+                Precio Final del Combo ($) *
+              </label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-[#5B50D6]">
+                  <DollarSign className="w-4 h-4" />
+                </span>
+                <input
+                  id="combo_final_price"
+                  type="number"
+                  name="base_price"
+                  step="any"
+                  min="0"
+                  required
+                  value={formData.base_price}
+                  onChange={handleFinalPriceChange}
+                  className="mt-1 block w-full pl-9 pr-3 border border-[#5B50D6]/30 rounded-xl p-3 bg-[#5B50D6]/5 text-slate-900 font-extrabold focus:ring-2 focus:ring-[#5B50D6]/30 focus:border-[#5B50D6] transition-colors text-sm shadow-sm font-mono"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Suma del costo individual de componentes:
-              </p>
-              <p className="text-xl font-extrabold text-slate-900 font-mono mt-0.5">
-                ${originalTotalValue.toFixed(2)}
-              </p>
-            </div>
-            {Number(formData.base_price) > 0 && (
-              <div
-                className={`px-4 py-2 rounded-xl text-xs font-bold ${
-                  Number(formData.base_price) < originalTotalValue
-                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          {totalRetailValue > 0 && numericFinalPrice > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+              <span className="text-slate-500">
+                Diferencia respecto a la suma de productos por separado:
+              </span>
+              <span
+                className={`px-3 py-1 rounded-lg font-bold font-mono ${
+                  priceDifference < 0
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : priceDifference > 0
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                    : 'bg-slate-100 text-slate-700'
                 }`}
               >
-                Margen Bruto: ${(Number(formData.base_price) - originalTotalValue).toFixed(2)}
-              </div>
-            )}
-          </div>
+                {priceDifference < 0
+                  ? `Ahorro cliente: $${Math.abs(priceDifference).toFixed(2)}`
+                  : priceDifference > 0
+                  ? `Recargo combo: +$${priceDifference.toFixed(2)}`
+                  : 'Mismo precio que por separado ($0.00)'}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pb-10">
