@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Truck } from 'lucide-react';
 import { SupplierService, type Supplier } from '../../../services/supplier.service';
+import { toast } from 'sonner';
 
 interface QuickProviderModalProps {
   isOpen: boolean;
@@ -32,9 +33,10 @@ export const QuickProviderModal = ({ isOpen, onClose, onSuccess }: QuickProvider
       const newSupplier = await SupplierService.create(formData);
       onSuccess(newSupplier);
       setFormData({ name: '', tax_id: '', email: '', phone: '' });
+      toast.success(`Proveedor "${newSupplier.name}" creado con éxito.`);
     } catch (error: any) {
       console.error('Error creando proveedor:', error);
-      alert(error.response?.data?.error || 'No se pudo crear el proveedor.');
+      toast.error(error.response?.data?.error || 'No se pudo crear el proveedor.');
     } finally {
       setIsSubmitting(false);
     }

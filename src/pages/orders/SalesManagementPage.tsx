@@ -18,6 +18,7 @@ import {
   CreditCard,
   Wallet,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
 import { OrderService } from '../../services/order.service';
 import { UserService } from '../../services/user.service';
@@ -101,6 +102,11 @@ export const SalesManagementPage = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    order: ManageableOrder;
+    nextStatus: OrderStatus;
+  } | null>(null);
+
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
@@ -161,23 +167,22 @@ export const SalesManagementPage = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleStatusChange = async (order: ManageableOrder, nextStatus: OrderStatus) => {
+  const openStatusConfirmModal = (order: ManageableOrder, nextStatus: OrderStatus) => {
     if (nextStatus === order.status) return;
+    if (!STATUS_META[nextStatus]) return;
+    setPendingStatusChange({ order, nextStatus });
+  };
 
+  const cancelStatusChange = () => {
+    if (updatingOrderId) return;
+    setPendingStatusChange(null);
+    toast.info('Cambio de estado cancelado.');
+  };
+
+  const confirmStatusChange = async () => {
+    if (!pendingStatusChange) return;
+    const { order, nextStatus } = pendingStatusChange;
     const targetMeta = STATUS_META[nextStatus];
-    if (!targetMeta) return;
-
-    const extraNote =
-      nextStatus === 'CANCELED'
-        ? ' (Se repondrá el stock y se revertirá la comisión si corresponde)'
-        : order.status === 'PAID' && nextStatus === 'DELIVERED'
-        ? ' (Entrega directa / retiro sin envío)'
-        : '';
-
-    const confirmed = window.confirm(
-      `¿Confirmas cambiar el estado de la orden #ORD-${order.order_number} a "${targetMeta.label}"${extraNote}?`
-    );
-    if (!confirmed) return;
 
     setUpdatingOrderId(order.id);
     setErrorMsg(null);
@@ -209,9 +214,14 @@ export const SalesManagementPage = () => {
             : null
         );
       }
+
+      setPendingStatusChange(null);
+      toast.success(`Orden #ORD-${order.order_number} ${targetMeta.label}.`);
     } catch (error: any) {
       console.error('[SalesManagementPage] Error actualizando estado:', error);
-      setErrorMsg(error.response?.data?.error || 'No se pudo actualizar el estado de la orden.');
+      const msg = error.response?.data?.error || 'No se pudo actualizar el estado de la orden.';
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setUpdatingOrderId(null);
     }
@@ -219,7 +229,11 @@ export const SalesManagementPage = () => {
 
   const handleSubmitShippingIssue = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrder || !issueReason.trim()) return;
+    if (!selectedOrder) return;
+    if (!issueReason.trim()) {
+      toast.warning('Debes ingresar el motivo de la incidencia.');
+      return;
+    }
 
     try {
       setIsReportingIssue(true);
@@ -228,12 +242,14 @@ export const SalesManagementPage = () => {
 
       const res = await OrderService.reportShippingIssue(selectedOrder.id, issueReason.trim());
       setSuccessMsg(res.message);
+      toast.success(res.message);
       setIssueReason('');
       setIsIssueModalOpen(false);
     } catch (error: any) {
-      setErrorMsg(
-        error.response?.data?.error || 'No se pudo registrar la incidencia logística.'
-      );
+      const msg =
+        error.response?.data?.error || 'No se pudo registrar la incidencia logística.';
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsReportingIssue(false);
     }
@@ -581,7 +597,7 @@ export const SalesManagementPage = () => {
                                 key={nextStatus}
                                 type="button"
                                 disabled={isUpdating}
-                                onClick={() => handleStatusChange(order, nextStatus)}
+                                onClick={() => openStatusConfirmModal(order, nextStatus)}
                                 title={
                                   order.status === 'PAID' && nextStatus === 'DELIVERED'
                                     ? 'Marcar como entregada directamente (sin envío)'
@@ -836,7 +852,7 @@ export const SalesManagementPage = () => {
                         key={nextStatus}
                         type="button"
                         disabled={isUpdating}
-                        onClick={() => handleStatusChange(selectedOrder, nextStatus)}
+                        onClick={() => openStatusConfirmModal(selectedOrder, nextStatus)}
                         className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm disabled:opacity-50 ${nextMeta.buttonClass}`}
                       >
                         {renderStatusIcon(nextStatus)}
@@ -861,6 +877,7 @@ export const SalesManagementPage = () => {
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <form
             onSubmit={handleSubmitShippingIssue}
+            noValidate
             className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden"
           >
             <div className="px-6 py-4 border-b border-slate-100 bg-rose-50/70 flex items-center justify-between">
@@ -916,6 +933,97 @@ export const SalesManagementPage = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {pendingStatusChange && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden">
+            <div
+              className={`px-6 py-4 border-b border-slate-100 flex items-center justify-between ${
+                pendingStatusChange.nextStatus === 'CANCELED'
+                  ? 'bg-rose-50/70'
+                  : 'bg-slate-50/70'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    pendingStatusChange.nextStatus === 'CANCELED'
+                      ? 'bg-rose-100 text-rose-600'
+                      : 'bg-indigo-50 text-[#5B50D6]'
+                  }`}
+                >
+                  {pendingStatusChange.nextStatus === 'CANCELED' ? (
+                    <AlertTriangle className="w-4 h-4" />
+                  ) : (
+                    renderStatusIcon(pendingStatusChange.nextStatus)
+                  )}
+                </div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Confirmar Cambio de Estado
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={cancelStatusChange}
+                disabled={updatingOrderId !== null}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg disabled:opacity-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-2.5">
+              <p className="text-sm text-slate-700 leading-relaxed">
+                ¿Confirmas cambiar el estado de la orden{' '}
+                <strong className="font-mono text-slate-900">
+                  #ORD-{pendingStatusChange.order.order_number}
+                </strong>{' '}
+                a{' '}
+                <strong className="text-slate-900">
+                  "{STATUS_META[pendingStatusChange.nextStatus].label}"
+                </strong>
+                ?
+              </p>
+
+              {pendingStatusChange.nextStatus === 'CANCELED' && (
+                <p className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                  Se repondrá automáticamente el stock de los productos y se revertirá la comisión asociada si corresponde.
+                </p>
+              )}
+
+              {pendingStatusChange.order.status === 'PAID' &&
+                pendingStatusChange.nextStatus === 'DELIVERED' && (
+                  <p className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                    Entrega directa / retiro en local sin paso intermedio de envío.
+                  </p>
+                )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelStatusChange}
+                disabled={updatingOrderId !== null}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmStatusChange}
+                disabled={updatingOrderId !== null}
+                className={`px-4 py-2 text-xs font-bold rounded-xl shadow-sm disabled:opacity-50 ${
+                  STATUS_META[pendingStatusChange.nextStatus].buttonClass
+                }`}
+              >
+                {updatingOrderId !== null
+                  ? 'Guardando...'
+                  : `Confirmar (${STATUS_META[pendingStatusChange.nextStatus].actionLabel})`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

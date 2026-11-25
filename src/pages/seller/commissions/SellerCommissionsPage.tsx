@@ -11,7 +11,9 @@ import {
   Receipt,
   Filter,
   Send,
+  X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { CommissionService } from '../../../services/commission.service';
 import type {
   CommissionStatus,
@@ -63,6 +65,7 @@ export default function SellerCommissionsPage() {
 
   const [loading, setLoading] = useState(true);
   const [filtering, setFiltering] = useState(false);
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [requestingPayout, setRequestingPayout] = useState(false);
   const [payoutSuccessMsg, setPayoutSuccessMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,10 +85,11 @@ export default function SellerCommissionsPage() {
       setPayouts(payoutsRes);
     } catch (err: any) {
       console.error('[SellerCommissions] Error cargando comisiones:', err);
-      setError(
+      const msg =
         err?.response?.data?.error ||
-          'No se pudo cargar la información de tus comisiones.'
-      );
+        'No se pudo cargar la información de tus comisiones.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -108,23 +112,28 @@ export default function SellerCommissionsPage() {
       setSummary(res.summary);
       setCommissions(res.commissions);
     } catch (err: any) {
-      setError(
-        err?.response?.data?.error || 'Error al filtrar las comisiones.'
-      );
+      const msg =
+        err?.response?.data?.error || 'Error al filtrar las comisiones.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setFiltering(false);
     }
   };
 
-  const handleRequestPayout = async () => {
+  const openPayoutConfirmModal = () => {
     if (!summary?.cbu_alias || (summary?.available_balance ?? 0) <= 0) return;
+    setIsPayoutModalOpen(true);
+  };
 
-    const confirmed = window.confirm(
-      `¿Confirmas notificar a Administración para solicitar el retiro de $${summary.available_balance.toLocaleString(
-        'es-AR'
-      )} ARS hacia tu cuenta "${summary.cbu_alias}"?`
-    );
-    if (!confirmed) return;
+  const cancelPayoutRequest = () => {
+    if (requestingPayout) return;
+    setIsPayoutModalOpen(false);
+    toast.info('Solicitud de liquidación cancelada.');
+  };
+
+  const confirmRequestPayout = async () => {
+    if (!summary?.cbu_alias || (summary?.available_balance ?? 0) <= 0) return;
 
     try {
       setRequestingPayout(true);
@@ -133,11 +142,14 @@ export default function SellerCommissionsPage() {
 
       const res = await CommissionService.requestPayout();
       setPayoutSuccessMsg(res.message);
+      setIsPayoutModalOpen(false);
+      toast.success(res.message);
     } catch (err: any) {
-      setError(
+      const msg =
         err?.response?.data?.error ||
-          'No se pudo enviar la solicitud de retiro.'
-      );
+        'No se pudo enviar la solicitud de retiro.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setRequestingPayout(false);
     }
@@ -247,7 +259,7 @@ export default function SellerCommissionsPage() {
           <div className="mt-4">
             <button
               type="button"
-              onClick={handleRequestPayout}
+              onClick={openPayoutConfirmModal}
               disabled={!canRequestPayout || requestingPayout || Boolean(payoutSuccessMsg)}
               title={
                 !summary?.cbu_alias
@@ -560,6 +572,68 @@ export default function SellerCommissionsPage() {
             </div>
           )}
         </section>
+      )}
+
+      {isPayoutModalOpen && summary && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-emerald-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <Send className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900">
+                  Solicitar Liquidación
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={cancelPayoutRequest}
+                disabled={requestingPayout}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-slate-700 leading-relaxed">
+                ¿Confirmas notificar a Administración para solicitar el retiro de{' '}
+                <strong className="font-mono text-emerald-700">
+                  ${availableBalance.toLocaleString('es-AR')} ARS
+                </strong>
+                ?
+              </p>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                <p className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                  Cuenta destino registrada
+                </p>
+                <p className="font-mono font-bold text-slate-900 text-sm">
+                  {summary.cbu_alias}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={cancelPayoutRequest}
+                disabled={requestingPayout}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmRequestPayout}
+                disabled={requestingPayout}
+                className="px-4 py-2 text-xs font-bold text-slate-950 bg-emerald-500 hover:bg-emerald-400 rounded-xl shadow-sm disabled:opacity-50"
+              >
+                {requestingPayout ? 'Enviando...' : 'Sí, solicitar retiro'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

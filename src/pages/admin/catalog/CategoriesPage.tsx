@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   FolderTree, Plus, ChevronRight, ChevronDown, Edit3, Trash2,
-  FolderPlus, Package, CheckCircle2, XCircle, X
+  FolderPlus, Package, CheckCircle2, XCircle, X, AlertTriangle
 } from 'lucide-react';
 import { CategoryService } from '../../../services/category.service';
 import type { CategoryTreeNode } from '../../../types/category';
+import { toast } from 'sonner';
 
 export const CategoriesPage = () => {
   const [tree, setTree] = useState<CategoryTreeNode[]>([]);
@@ -17,6 +18,9 @@ export const CategoriesPage = () => {
   const [selectedParentId, setSelectedParentId] = useState<string>('');
   const [isActiveInput, setIsActiveInput] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [nodeToDelete, setNodeToDelete] = useState<CategoryTreeNode | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadTree = async () => {
     try {
@@ -73,7 +77,10 @@ export const CategoriesPage = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nameInput.trim()) return;
+    if (!nameInput.trim()) {
+      toast.warning('El nombre de la categoría es obligatorio.');
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -83,6 +90,7 @@ export const CategoriesPage = () => {
           parent_id: selectedParentId || null,
           is_active: isActiveInput,
         });
+        toast.success('Categoría actualizada con éxito.');
       } else {
         await CategoryService.create({
           name: nameInput.trim(),
@@ -92,23 +100,40 @@ export const CategoriesPage = () => {
         if (selectedParentId) {
           setExpandedIds((prev) => ({ ...prev, [selectedParentId]: true }));
         }
+        toast.success('Categoría creada con éxito.');
       }
       setIsModalOpen(false);
       await loadTree();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'No se pudo guardar la categoría.');
+      toast.error(error.response?.data?.error || 'No se pudo guardar la categoría.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (node: CategoryTreeNode) => {
-    if (!window.confirm(`¿Eliminar definitivamente la categoría "${node.name}"?`)) return;
+  const openDeleteModal = (node: CategoryTreeNode) => {
+    setNodeToDelete(node);
+  };
+
+  const cancelDelete = () => {
+    if (isDeleting) return;
+    setNodeToDelete(null);
+    toast.info('Eliminación cancelada.');
+  };
+
+  const confirmDelete = async () => {
+    if (!nodeToDelete) return;
+    setIsDeleting(true);
     try {
-      await CategoryService.delete(node.id);
+      await CategoryService.delete(nodeToDelete.id);
+      const deletedName = nodeToDelete.name;
+      setNodeToDelete(null);
       await loadTree();
+      toast.success(`Categoría "${deletedName}" eliminada con éxito.`);
     } catch (error: any) {
-      alert(error.response?.data?.error || 'No se pudo eliminar la categoría.');
+      toast.error(error.response?.data?.error || 'No se pudo eliminar la categoría.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -209,7 +234,7 @@ export const CategoriesPage = () => {
 
               <button
                 type="button"
-                onClick={() => handleDelete(node)}
+                onClick={() => openDeleteModal(node)}
                 disabled={!canDelete}
                 title={
                   canDelete
@@ -279,7 +304,7 @@ export const CategoriesPage = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+            <form onSubmit={handleSave} noValidate className="p-6 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                   Nombre de Categoría *
@@ -344,6 +369,58 @@ export const CategoriesPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {nodeToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-rose-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900">Eliminar Categoría</h3>
+              </div>
+              <button
+                type="button"
+                onClick={cancelDelete}
+                disabled={isDeleting}
+                className="text-slate-400 hover:text-slate-600 p-1 disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-2">
+              <p className="text-sm text-slate-700">
+                ¿Estás seguro de que deseas eliminar definitivamente la categoría{' '}
+                <strong className="text-slate-900">"{nodeToDelete.name}"</strong>?
+              </p>
+              <p className="text-xs text-slate-500">
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={cancelDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="px-5 py-2 text-sm font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 disabled:opacity-50"
+              >
+                {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

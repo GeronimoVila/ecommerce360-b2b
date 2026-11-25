@@ -7,6 +7,7 @@ import {
 import { ProductService } from '../../../services/product.service';
 import { CategoryService } from '../../../services/category.service';
 import type { Product } from '../../../types/product';
+import { toast } from 'sonner';
 
 type DomainType = 'simple' | 'combo';
 type FilterState = 'ALL' | 'ACTIVE' | 'INACTIVE';
@@ -84,11 +85,16 @@ export const CatalogPage = () => {
     try {
       await ProductService.toggleStatus(product.id, product.is_active);
       fetchProducts();
+      toast.success(
+        product.is_active
+          ? `Producto "${product.name}" desactivado.`
+          : `Producto "${product.name}" activado.`
+      );
     } catch (error) {
       console.error('Error al cambiar estado:', error);
-      alert('Hubo un error al actualizar el estado del producto.');
+      toast.error('Hubo un error al actualizar el estado del producto.');
     }
-  };
+};
 
   const filteredProducts = products.filter((p) => {
     const stock = getEffectiveStock(p);

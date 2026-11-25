@@ -3,6 +3,7 @@ import {
   User, Lock, Copy, CheckCircle2, Edit3, 
   ShieldCheck, Wallet, X 
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { UserService } from '../../services/user.service';
 
 export const MyProfilePage = () => {
@@ -26,7 +27,7 @@ export const MyProfilePage = () => {
         setProfile(data);
         setCbuValue(data.seller_profile?.cbu_alias || '');
       })
-      .catch(() => alert('Error cargando tu perfil'))
+      .catch(() => toast.error('Error cargando tu perfil.'))
       .finally(() => setIsLoading(false));
   };
 
@@ -39,6 +40,7 @@ export const MyProfilePage = () => {
     const referralLink = `${B2C_URL}?ref=${profile.id}`;
     navigator.clipboard.writeText(referralLink);
     setCopied(true);
+    toast.success('Link de afiliado copiado al portapapeles.');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -48,8 +50,9 @@ export const MyProfilePage = () => {
       await UserService.updateMe({ cbu_alias: cbuValue });
       setIsEditingCBU(false);
       fetchProfile();
+      toast.success('CBU / Alias actualizado con éxito.');
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Error guardando CBU');
+      toast.error(error.response?.data?.error || 'Error guardando CBU.');
     } finally {
       setIsSavingCBU(false);
     }
@@ -57,12 +60,16 @@ export const MyProfilePage = () => {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passwordData.current.trim()) {
+      toast.warning('Debes ingresar tu contraseña actual.');
+      return;
+    }
     if (passwordData.new !== passwordData.confirm) {
-      alert('Las contraseñas nuevas no coinciden.');
+      toast.warning('Las contraseñas nuevas no coinciden.');
       return;
     }
     if (passwordData.new.length < 8) {
-      alert('La contraseña debe tener al menos 8 caracteres.');
+      toast.warning('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
 
@@ -72,11 +79,11 @@ export const MyProfilePage = () => {
         current_password: passwordData.current,
         new_password: passwordData.new
       });
-      alert('✅ Contraseña actualizada correctamente. Tu cuenta es segura.');
+      toast.success('Contraseña actualizada correctamente. Tu cuenta es segura.');
       setIsPasswordModalOpen(false);
       setPasswordData({ current: '', new: '', confirm: '' });
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Error al cambiar la contraseña');
+      toast.error(error.response?.data?.error || 'Error al cambiar la contraseña.');
     } finally {
       setIsSavingPassword(false);
     }
@@ -233,7 +240,7 @@ export const MyProfilePage = () => {
               </button>
             </div>
             
-            <form onSubmit={handlePasswordSubmit} className="p-6 space-y-4">
+            <form onSubmit={handlePasswordSubmit} noValidate className="p-6 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contraseña Actual *</label>
                 <input 

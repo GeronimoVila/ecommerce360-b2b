@@ -6,6 +6,7 @@ import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 import { ProductImageUploader } from '../../../components/admin/catalog/ProductImageUploader';
 import type { Product, ProductImage } from '../../../types/product';
+import { toast } from 'sonner';
 
 interface FieldErrors {
   sku?: string;
@@ -99,7 +100,7 @@ export const ComboFormPage = () => {
         }
       } catch (error) {
         console.error('Error inicializando combo:', error);
-        alert('No se pudo cargar la información del combo.');
+        toast.error('No se pudo cargar la información del combo.');
         navigate('/admin/catalog');
       } finally {
         setIsLoadingInitialData(false);

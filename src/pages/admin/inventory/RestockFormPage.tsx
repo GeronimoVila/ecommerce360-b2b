@@ -10,6 +10,7 @@ import { SupplierService, type Supplier } from '../../../services/supplier.servi
 import type { Product } from '../../../types/product';
 import { QuickProductModal } from '../products/QuickProductModal';
 import { QuickProviderModal } from './QuickProviderModal';
+import { toast } from 'sonner';
 
 interface ProductAutocompleteProps {
   products: Product[];
@@ -151,18 +152,18 @@ export const RestockFormPage = () => {
     e.preventDefault();
 
     if (!metadata.provider_name || metadata.provider_name.trim() === '') {
-      alert('Error: Debes seleccionar un proveedor existente o crear uno nuevo obligatoriamente.');
+      toast.warning('Debes seleccionar un proveedor existente o crear uno nuevo obligatoriamente.');
       return;
     }
 
     const validItems = items.filter(item => item.sku !== '' && item.quantity !== '');
     if (validItems.length === 0) {
-      alert('Debe ingresar al menos un producto con cantidad.');
+      toast.warning('Debes ingresar al menos un producto con cantidad.');
       return;
     }
 
     if (validItems.some(item => Number(item.quantity) <= 0)) {
-      alert('Todas las cantidades deben ser mayores a 0.');
+      toast.warning('Todas las cantidades deben ser mayores a 0.');
       return;
     }
 
@@ -179,14 +180,14 @@ export const RestockFormPage = () => {
       const response = await InventoryService.processRestock({
         provider_name: metadata.provider_name,
         reference_document: metadata.reference_document || undefined,
-        items: consolidatedItems
+        items: consolidatedItems,
       });
-      
-      alert(`✅ ${response.message}`);
-      navigate('/admin/catalog'); 
+
+      toast.success(response.message);
+      navigate('/admin/catalog');
     } catch (error: any) {
       console.error('[Arquitectura] Error en restock:', error);
-      alert(error.response?.data?.error || 'Error al procesar el ingreso de mercadería.');
+      toast.error(error.response?.data?.error || 'Error al procesar el ingreso de mercadería.');
     } finally {
       setIsSubmitting(false);
     }
@@ -202,7 +203,7 @@ export const RestockFormPage = () => {
         <p className="text-sm text-slate-500 mt-1">Registra remitos de proveedores para incrementar el stock físico.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} noValidate className="space-y-6">
         <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100 text-slate-900 font-bold text-base">
             <FileText className="w-5 h-5 text-[#5B50D6]" />

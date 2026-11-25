@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Sliders } from 'lucide-react';
 import { PaymentRuleService, type PaymentRulePayload, type PaymentRule } from '../../../services/payment-rule.service';
 import { CategoryService } from '../../../services/category.service';
+import { toast } from 'sonner';
 
 interface PaymentRuleModalProps {
   isOpen: boolean;
@@ -83,11 +84,11 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
     e.preventDefault();
 
     if (targetType === 'CATEGORY' && !formData.category_id) {
-      alert('Debes seleccionar una categoría.');
+      toast.warning('Debes seleccionar una categoría.');
       return;
     }
     if (targetType === 'PRODUCT' && !formData.product_id) {
-      alert('Debes proporcionar un ID de producto.');
+      toast.warning('Debes proporcionar un ID de producto.');
       return;
     }
 
@@ -96,19 +97,21 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
     try {
       if (ruleToEdit) {
         await PaymentRuleService.update(ruleToEdit.id, formData.coefficient, true);
+        toast.success('Regla financiera actualizada con éxito.');
       } else {
         const payload: PaymentRulePayload = {
           ...formData,
           category_id: targetType === 'CATEGORY' ? formData.category_id : null,
-          product_id: targetType === 'PRODUCT' ? formData.product_id : null
+          product_id: targetType === 'PRODUCT' ? formData.product_id : null,
         };
         await PaymentRuleService.create(payload);
+        toast.success('Regla financiera creada con éxito.');
       }
 
       onSuccess();
     } catch (error: any) {
       console.error('[PaymentRuleModal] Error:', error);
-      alert(error.response?.data?.error || 'Error al guardar la regla financiera.');
+      toast.error(error.response?.data?.error || 'Error al guardar la regla financiera.');
     } finally {
       setIsSubmitting(false);
     }
@@ -134,7 +137,7 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">

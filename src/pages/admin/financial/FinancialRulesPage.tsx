@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Sliders, Ticket, CreditCard, Trash2, Edit3 } from 'lucide-react';
+import { Plus, Sliders, Ticket, CreditCard, Trash2, Edit3, AlertTriangle, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { PaymentRuleService, type PaymentRule } from '../../../services/payment-rule.service';
 import { PaymentRuleModal } from '../../../components/admin/financial/PaymentRuleModal';
 import { CouponService, type Coupon } from '../../../services/coupon.service';
@@ -19,6 +20,9 @@ export const FinancialRulesPage = () => {
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(true);
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [couponToEdit, setCouponToEdit] = useState<Coupon | null>(null);
+
+  const [couponToDelete, setCouponToDelete] = useState<Coupon | null>(null);
+  const [isDeletingCoupon, setIsDeletingCoupon] = useState(false);
 
   const fetchRules = async () => {
     try {
@@ -53,12 +57,14 @@ export const FinancialRulesPage = () => {
     try {
       if (rule.is_active) {
         await PaymentRuleService.softDelete(rule.id);
+        toast.success('Regla financiera desactivada.');
       } else {
         await PaymentRuleService.update(rule.id, Number(rule.coefficient), true);
+        toast.success('Regla financiera reactivada.');
       }
       fetchRules();
     } catch (error) {
-      alert('Error al cambiar el estado de la regla.');
+      toast.error('Error al cambiar el estado de la regla.');
     }
   };
 
@@ -66,18 +72,39 @@ export const FinancialRulesPage = () => {
     try {
       await CouponService.update(coupon.id, { is_active: !coupon.is_active });
       fetchCoupons();
+      toast.success(
+        coupon.is_active
+          ? `Cupón "${coupon.code}" pausado.`
+          : `Cupón "${coupon.code}" activado.`
+      );
     } catch (error) {
-      alert('Error al actualizar el estado del cupón.');
+      toast.error('Error al actualizar el estado del cupón.');
     }
   };
 
-  const handleDeleteCoupon = async (coupon: Coupon) => {
-    if (!confirm(`¿Eliminar o desactivar el cupón ${coupon.code}?`)) return;
+  const openDeleteCouponModal = (coupon: Coupon) => {
+    setCouponToDelete(coupon);
+  };
+
+  const cancelDeleteCoupon = () => {
+    if (isDeletingCoupon) return;
+    setCouponToDelete(null);
+    toast.info('Eliminación de cupón cancelada.');
+  };
+
+  const confirmDeleteCoupon = async () => {
+    if (!couponToDelete) return;
+    setIsDeletingCoupon(true);
     try {
-      await CouponService.remove(coupon.id);
+      await CouponService.remove(couponToDelete.id);
+      const code = couponToDelete.code;
+      setCouponToDelete(null);
       fetchCoupons();
+      toast.success(`Cupón "${code}" eliminado o desactivado con éxito.`);
     } catch (error) {
-      alert('Error al eliminar el cupón.');
+      toast.error('Error al eliminar el cupón.');
+    } finally {
+      setIsDeletingCoupon(false);
     }
   };
 
@@ -365,7 +392,7 @@ export const FinancialRulesPage = () => {
                               {coupon.is_active ? 'Pausar' : 'Activar'}
                             </button>
                             <button
-                              onClick={() => handleDeleteCoupon(coupon)}
+                              onClick={() => openDeleteCouponModal(coupon)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                               title="Eliminar cupón"
                             >
@@ -402,6 +429,58 @@ export const FinancialRulesPage = () => {
         }}
         couponToEdit={couponToEdit}
       />
+
+      {couponToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-rose-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900">Eliminar Cupón</h3>
+              </div>
+              <button
+                type="button"
+                onClick={cancelDeleteCoupon}
+                disabled={isDeletingCoupon}
+                className="text-slate-400 hover:text-slate-600 p-1 disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-2">
+              <p className="text-sm text-slate-700">
+                ¿Estás seguro de que deseas eliminar o desactivar el cupón{' '}
+                <strong className="font-mono text-slate-900">{couponToDelete.code}</strong>?
+              </p>
+              <p className="text-xs text-slate-500">
+                Si el cupón ya fue utilizado en ventas previas, se desactivará para preservar la auditoría.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={cancelDeleteCoupon}
+                disabled={isDeletingCoupon}
+                className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteCoupon}
+                disabled={isDeletingCoupon}
+                className="px-5 py-2 text-sm font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 disabled:opacity-50"
+              >
+                {isDeletingCoupon ? 'Procesando...' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -14,6 +14,7 @@ import {
   FilterX,
   AlertTriangle,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 type TabState = 'PENDING' | 'HISTORY';
 type CbuReadinessFilter = 'ALL' | 'READY' | 'MISSING';
@@ -79,21 +80,21 @@ export const CommissionsPage: React.FC = () => {
     loadData(activeTab);
   }, [activeTab]);
 
-  const handleLiquidate = async (transactionRef: string) => {
-    if (!selectedGroup) return;
-    try {
-      await CommissionService.liquidate({
-        seller_id: selectedGroup.seller_id,
-        transaction_ref: transactionRef,
-        commission_ids: selectedGroup.commission_ids,
-      });
-      setSelectedGroup(null);
-      await loadData('PENDING');
-      alert('✅ Pago registrado con éxito.');
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Fallo al liquidar. Refresca la página.');
-    }
-  };
+const handleLiquidate = async (transactionRef: string) => {
+  if (!selectedGroup) return;
+  try {
+    await CommissionService.liquidate({
+      seller_id: selectedGroup.seller_id,
+      transaction_ref: transactionRef,
+      commission_ids: selectedGroup.commission_ids,
+    });
+    setSelectedGroup(null);
+    await loadData('PENDING');
+    toast.success('Pago registrado con éxito.');
+  } catch (err: any) {
+    toast.error(err.response?.data?.error || 'Fallo al liquidar.');
+  }
+};
 
   const hasActiveFilters =
     searchQuery.trim() !== '' ||

@@ -9,7 +9,12 @@ import {
   X,
   FilterX,
   ArrowUpDown,
+  AlertTriangle,
+  Check,
+  Copy,
+  KeyRound,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   UserService,
   type CreateSellerPayload,
@@ -48,6 +53,16 @@ export const SellersManagementPage = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [sellerToEdit, setSellerToEdit] = useState<any | null>(null);
+
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string;
+    email: string;
+    temporary_password: string;
+  } | null>(null);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+
+  const [sellerToToggle, setSellerToToggle] = useState<any | null>(null);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
   const [createFormData, setCreateFormData] = useState<CreateSellerPayload>({
     first_name: '',
@@ -161,16 +176,33 @@ export const SellersManagementPage = () => {
     setIsSubmitting(true);
     try {
       const res = await UserService.createSeller(createFormData);
-      alert(
-        `✅ Vendedor creado correctamente.\n\nContraseña temporal: ${res.temporary_password}\n¡Cópiala ahora, no se volverá a mostrar!`
-      );
+      const fullName = `${createFormData.first_name} ${createFormData.last_name}`.trim();
+
       setIsCreateModalOpen(false);
+      setCopiedPassword(false);
+      setCreatedCredentials({
+        name: fullName,
+        email: createFormData.email,
+        temporary_password: res.temporary_password,
+      });
       setCreateFormData({ first_name: '', last_name: '', email: '', cbu_alias: '' });
       fetchSellers();
+      toast.success('Vendedor creado correctamente.');
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Error al crear vendedor');
+      toast.error(error.response?.data?.error || 'Error al crear vendedor.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCopyTempPassword = async () => {
+    if (!createdCredentials?.temporary_password) return;
+    try {
+      await navigator.clipboard.writeText(createdCredentials.temporary_password);
+      setCopiedPassword(true);
+      toast.success('Contraseña temporal copiada al portapapeles.');
+    } catch {
+      toast.error('No se pudo copiar automáticamente. Selecciónala manualmente.');
     }
   };
 
@@ -191,30 +223,50 @@ export const SellersManagementPage = () => {
     setIsSubmitting(true);
     try {
       await UserService.updateUser(sellerToEdit.id, editFormData);
-      alert('✅ Vendedor actualizado exitosamente.');
+      toast.success('Vendedor actualizado exitosamente.');
       setSellerToEdit(null);
       fetchSellers();
     } catch (error: any) {
       console.error('[SellersManagementPage] Error actualizando vendedor:', error);
-      alert(error.response?.data?.error || 'Error al actualizar los datos del vendedor.');
+      toast.error(error.response?.data?.error || 'Error al actualizar los datos del vendedor.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (seller: any) => {
-    const actionText = seller.is_active ? 'suspender' : 'reactivar';
-    if (!confirm(`¿Estás seguro de ${actionText} a ${seller.seller_profile?.first_name}?`)) return;
+  const openToggleStatusModal = (seller: any) => {
+    setSellerToToggle(seller);
+  };
+
+  const cancelToggleStatus = () => {
+    if (isTogglingStatus) return;
+    setSellerToToggle(null);
+    toast.info('Cambio de estado cancelado.');
+  };
+
+  const confirmToggleStatus = async () => {
+    if (!sellerToToggle) return;
+    setIsTogglingStatus(true);
+    const wasActive = sellerToToggle.is_active;
+    const firstName = sellerToToggle.seller_profile?.first_name || 'el vendedor';
 
     try {
-      if (seller.is_active) {
-        await UserService.deactivateUser(seller.id);
+      if (wasActive) {
+        await UserService.deactivateUser(sellerToToggle.id);
       } else {
-        await UserService.updateUser(seller.id, { is_active: true });
+        await UserService.updateUser(sellerToToggle.id, { is_active: true });
       }
+      setSellerToToggle(null);
       fetchSellers();
-    } catch (error) {
-      alert('Error cambiando estado del vendedor');
+      toast.success(
+        wasActive
+          ? `Vendedor ${firstName} suspendido con éxito.`
+          : `Vendedor ${firstName} reactivado con éxito.`
+      );
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Error cambiando el estado del vendedor.');
+    } finally {
+      setIsTogglingStatus(false);
     }
   };
 
@@ -461,7 +513,7 @@ export const SellersManagementPage = () => {
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleToggleStatus(seller)}
+                            onClick={() => openToggleStatusModal(seller)}
                             className={`p-1.5 rounded-lg transition-colors ${
                               seller.is_active
                                 ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
@@ -627,6 +679,68 @@ export const SellersManagementPage = () => {
         </div>
       )}
 
+      {createdCredentials && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-emerald-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-slate-900">Credenciales de Acceso</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCreatedCredentials(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-700">
+                El vendedor <strong className="text-slate-900">{createdCredentials.name}</strong> (
+                {createdCredentials.email}) fue dado de alta.
+              </p>
+
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
+                <p className="text-xs font-bold text-amber-800">
+                  Contraseña temporal (cópiala ahora, no se volverá a mostrar):
+                </p>
+                <div className="flex items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2">
+                  <code className="font-mono font-extrabold text-sm text-slate-900 select-all">
+                    {createdCredentials.temporary_password}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={handleCopyTempPassword}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#5B50D6] text-white hover:bg-indigo-700 transition-colors shrink-0"
+                  >
+                    {copiedPassword ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    {copiedPassword ? 'Copiada' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end px-6 py-4 border-t border-slate-100 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={() => setCreatedCredentials(null)}
+                className="px-5 py-2.5 text-sm font-bold text-white bg-[#1A1D27] rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                Entendido, ya la copié
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {sellerToEdit && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
@@ -721,6 +835,88 @@ export const SellersManagementPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {sellerToToggle && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
+            <div
+              className={`flex justify-between items-center px-6 py-4 border-b border-slate-100 ${
+                sellerToToggle.is_active ? 'bg-rose-50/70' : 'bg-emerald-50/70'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    sellerToToggle.is_active
+                      ? 'bg-rose-100 text-rose-600'
+                      : 'bg-emerald-100 text-emerald-600'
+                  }`}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-slate-900">
+                  {sellerToToggle.is_active ? 'Suspender Vendedor' : 'Reactivar Vendedor'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={cancelToggleStatus}
+                disabled={isTogglingStatus}
+                className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-2">
+              <p className="text-sm text-slate-700">
+                ¿Estás seguro de que deseas{' '}
+                <strong className="text-slate-900">
+                  {sellerToToggle.is_active ? 'suspender' : 'reactivar'}
+                </strong>{' '}
+                a{' '}
+                <strong className="text-slate-900">
+                  {sellerToToggle.seller_profile?.first_name}{' '}
+                  {sellerToToggle.seller_profile?.last_name}
+                </strong>
+                ?
+              </p>
+              <p className="text-xs text-slate-500">
+                {sellerToToggle.is_active
+                  ? 'El vendedor no podrá iniciar sesión ni generar nuevos presupuestos mientras esté suspendido.'
+                  : 'El vendedor recuperará el acceso inmediato a su portal.'}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={cancelToggleStatus}
+                disabled={isTogglingStatus}
+                className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmToggleStatus}
+                disabled={isTogglingStatus}
+                className={`px-5 py-2.5 text-sm font-bold text-white rounded-xl transition-all disabled:opacity-50 ${
+                  sellerToToggle.is_active
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+              >
+                {isTogglingStatus
+                  ? 'Procesando...'
+                  : sellerToToggle.is_active
+                  ? 'Sí, suspender'
+                  : 'Sí, reactivar'}
+              </button>
+            </div>
           </div>
         </div>
       )}

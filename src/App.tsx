@@ -1,5 +1,6 @@
 import { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { useAuthStore } from './store/authStore';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { PortalLayout } from './components/layout/PortalLayout';
@@ -36,51 +37,54 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Suspense fallback={
-        <div className="flex items-center justify-center h-screen bg-gray-50">
-           <div className="animate-pulse text-gray-500 font-semibold">Cargando módulo...</div>
-        </div>
-      }>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
+    <>
+      <Toaster position="bottom-right" richColors closeButton />
+      <BrowserRouter>
+        <Suspense fallback={
+          <div className="flex items-center justify-center h-screen bg-gray-50">
+             <div className="animate-pulse text-gray-500 font-semibold">Cargando módulo...</div>
+          </div>
+        }>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
 
-          <Route element={<ProtectedRoute allowedRoles={['SELLER', 'ADMIN']} />}>
-            <Route element={<PortalLayout />}>
-              <Route path="/portal/dashboard" element={<SellerDashboardPage />} />
-              <Route path="/portal/profile" element={<MyProfilePage />} />
-              <Route path="/portal/presupuestos/nuevo" element={<CreateBudgetPage />} />
+            <Route element={<ProtectedRoute allowedRoles={['SELLER', 'ADMIN']} />}>
+              <Route element={<PortalLayout />}>
+                <Route path="/portal/dashboard" element={<SellerDashboardPage />} />
+                <Route path="/portal/profile" element={<MyProfilePage />} />
+                <Route path="/portal/presupuestos/nuevo" element={<CreateBudgetPage />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-            <Route element={<PortalLayout />}>
-              <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-              <Route path="/admin/sales" element={<SalesManagementPage />} />
-              <Route path="/admin/catalog" element={<CatalogPage />} />
-              <Route path="/admin/catalog/new" element={<ProductFormPage />} />
-              <Route path="/admin/catalog/edit/:id" element={<ProductFormPage />} />
-              <Route path="/admin/catalog/combo/new" element={<ComboFormPage />} />
-              <Route path="/admin/catalog/combo/edit/:id" element={<ComboFormPage />} />
-              <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
-              <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
-              <Route path="/admin/team" element={<SellersManagementPage />} />
-              <Route path="/admin/commissions" element={<CommissionsPage />} />
-              <Route path="/admin/categories" element={<CategoriesPage />} />
+            <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+              <Route element={<PortalLayout />}>
+                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+                <Route path="/admin/sales" element={<SalesManagementPage />} />
+                <Route path="/admin/catalog" element={<CatalogPage />} />
+                <Route path="/admin/catalog/new" element={<ProductFormPage />} />
+                <Route path="/admin/catalog/edit/:id" element={<ProductFormPage />} />
+                <Route path="/admin/catalog/combo/new" element={<ComboFormPage />} />
+                <Route path="/admin/catalog/combo/edit/:id" element={<ComboFormPage />} />
+                <Route path="/admin/inventory/restock" element={<RestockFormPage />} />
+                <Route path="/admin/financial/rules" element={<FinancialRulesPage />} />
+                <Route path="/admin/team" element={<SellersManagementPage />} />
+                <Route path="/admin/commissions" element={<CommissionsPage />} />
+                <Route path="/admin/categories" element={<CategoriesPage />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['SELLER']} />}>
-            <Route element={<PortalLayout />}>
-              <Route path="/portal/sales" element={<SalesManagementPage />} />
-              <Route path="/portal/commissions" element={<SellerCommissionsPage />} />
+            <Route element={<ProtectedRoute allowedRoles={['SELLER']} />}>
+              <Route element={<PortalLayout />}>
+                <Route path="/portal/sales" element={<SalesManagementPage />} />
+                <Route path="/portal/commissions" element={<SellerCommissionsPage />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </>
   );
 }
 
