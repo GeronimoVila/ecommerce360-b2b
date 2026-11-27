@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   User,
   Lock,
-  Copy,
-  CheckCircle2,
   Edit3,
   ShieldCheck,
   Wallet,
@@ -24,7 +22,6 @@ export const MyProfilePage = () => {
   const { checkSession } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
 
   const [isEditingAccount, setIsEditingAccount] = useState(false);
   const [accountForm, setAccountForm] = useState({
@@ -41,8 +38,6 @@ export const MyProfilePage = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
   const [isSavingPassword, setIsSavingPassword] = useState(false);
-
-  const B2C_URL = import.meta.env.VITE_B2C_URL || 'http://localhost:3000';
 
   const fetchProfile = () => {
     UserService.getMe()
@@ -62,15 +57,6 @@ export const MyProfilePage = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
-
-  const handleCopyLink = () => {
-    if (!profile) return;
-    const referralLink = `${B2C_URL}?ref=${profile.id}`;
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    toast.success('Link de afiliado copiado al portapapeles.');
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,7 +166,7 @@ export const MyProfilePage = () => {
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Mi Perfil</h1>
             <p className="text-sm text-slate-500 mt-1">
               {isSeller
-                ? 'Configura tus datos comerciales, link de referidos y seguridad de cuenta.'
+                ? 'Configura tus datos comerciales, medio de cobro y seguridad de cuenta.'
                 : 'Gestiona tus datos de acceso y la seguridad de tu cuenta.'}
             </p>
           </div>
@@ -256,7 +242,7 @@ export const MyProfilePage = () => {
                       </div>
                     </>
                   )}
-                  <div className={isSeller ? 'md:col-span-2' : 'md:col-span-2'}>
+                  <div className="md:col-span-2">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                       Correo Electrónico de Acceso
                     </label>
@@ -299,16 +285,14 @@ export const MyProfilePage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 {isSeller && (
-                  <>
-                    <div>
-                      <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        Nombre y Apellido
-                      </span>
-                      <span className="font-semibold text-slate-900">
-                        {profile.seller_profile?.first_name} {profile.seller_profile?.last_name}
-                      </span>
-                    </div>
-                  </>
+                  <div>
+                    <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Nombre y Apellido
+                    </span>
+                    <span className="font-semibold text-slate-900">
+                      {profile.seller_profile?.first_name} {profile.seller_profile?.last_name}
+                    </span>
+                  </div>
                 )}
                 <div>
                   <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -321,64 +305,61 @@ export const MyProfilePage = () => {
           </div>
 
           {isSeller && (
-            <>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="border border-slate-200 rounded-2xl p-5 bg-white flex flex-col justify-between space-y-3 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Wallet className="w-3.5 h-3.5" /> CBU / Alias (Para cobros)
-                    </p>
-                    {!isEditingCBU && (
-                      <button
-                        onClick={() => setIsEditingCBU(true)}
-                        className="text-[#5B50D6] text-xs font-bold hover:text-indigo-800 transition-colors flex items-center gap-1"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" /> Editar
-                      </button>
-                    )}
-                  </div>
-
-                  {isEditingCBU ? (
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        value={cbuValue}
-                        onChange={(e) => setCbuValue(e.target.value)}
-                        placeholder="Ingresa tu CBU o Alias"
-                        className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono shadow-sm outline-none transition-colors"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSaveCBU}
-                          disabled={isSavingCBU}
-                          className="bg-[#5B50D6] text-white px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:bg-indigo-700 transition-colors"
-                        >
-                          {isSavingCBU ? 'Guardando...' : 'Guardar CBU'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsEditingCBU(false);
-                            setCbuValue(profile.seller_profile?.cbu_alias || '');
-                          }}
-                          className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-base font-mono font-semibold text-slate-900">
-                      {profile.seller_profile?.cbu_alias || (
-                        <span className="text-slate-400 italic text-sm font-sans">
-                          No configurado
-                        </span>
-                      )}
-                    </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="border border-slate-200 rounded-2xl p-5 bg-white flex flex-col justify-between space-y-3 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5" /> CBU / Alias (Para cobros)
+                  </p>
+                  {!isEditingCBU && (
+                    <button
+                      onClick={() => setIsEditingCBU(true)}
+                      className="text-[#5B50D6] text-xs font-bold hover:text-indigo-800 transition-colors flex items-center gap-1"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                    </button>
                   )}
                 </div>
+
+                {isEditingCBU ? (
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={cbuValue}
+                      onChange={(e) => setCbuValue(e.target.value)}
+                      placeholder="Ingresa tu CBU o Alias"
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono shadow-sm outline-none transition-colors"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveCBU}
+                        disabled={isSavingCBU}
+                        className="bg-[#5B50D6] text-white px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:bg-indigo-700 transition-colors"
+                      >
+                        {isSavingCBU ? 'Guardando...' : 'Guardar CBU'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditingCBU(false);
+                          setCbuValue(profile.seller_profile?.cbu_alias || '');
+                        }}
+                        className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-base font-mono font-semibold text-slate-900">
+                    {profile.seller_profile?.cbu_alias || (
+                      <span className="text-slate-400 italic text-sm font-sans">
+                        No configurado
+                      </span>
+                    )}
+                  </p>
+                )}
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
