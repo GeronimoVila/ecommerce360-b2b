@@ -5,7 +5,8 @@ import { ProductService } from '../../../services/product.service';
 import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 import { ProductImageUploader } from '../../../components/admin/catalog/ProductImageUploader';
-import type { ProductImage } from '../../../types/product';
+import { ProductSpecsEditor } from '../../../components/admin/catalog/ProductSpecsEditor';
+import type { ProductImage, TechnicalSpecItem } from '../../../types/product';
 
 interface FieldErrors {
   sku?: string;
@@ -34,6 +35,7 @@ export const ProductFormPage = () => {
   const [formData, setFormData] = useState<any>({
     sku: '',
     name: '',
+    description: '',
     category_id: '',
     purchase_cost: 0,
     vat_rate: 21,
@@ -42,6 +44,7 @@ export const ProductFormPage = () => {
     commission_rate: 0,
   });
 
+  const [technicalSpecs, setTechnicalSpecs] = useState<TechnicalSpecItem[]>([]);
   const [finalPriceInput, setFinalPriceInput] = useState<number | ''>(0);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -66,6 +69,7 @@ export const ProductFormPage = () => {
           setFormData({
             sku: product.sku || '',
             name: product.name || '',
+            description: product.description || '',
             category_id: product.category_id || product.category?.id || '',
             purchase_cost: cost,
             vat_rate: vat,
@@ -74,6 +78,7 @@ export const ProductFormPage = () => {
             commission_rate: Number(product.commission_rate ?? 0),
           });
 
+          setTechnicalSpecs(Array.isArray(product.technical_specs) ? product.technical_specs : []);
           setFinalPriceInput(computeFinalPrice(cost, vat, margin));
 
           const existingImages: ProductImage[] = Array.isArray(product.images) ? product.images : [];
@@ -205,6 +210,10 @@ export const ProductFormPage = () => {
     const sanitizedPayload = {
       sku: formData.sku.trim().toUpperCase(),
       name: formData.name.trim(),
+      description: formData.description?.trim() || null,
+      technical_specs: technicalSpecs
+        .map((s) => ({ key: s.key.trim(), value: s.value.trim() }))
+        .filter((s) => s.key && s.value),
       category_id: formData.category_id,
       purchase_cost: Number(formData.purchase_cost),
       vat_rate: Number(formData.vat_rate),
@@ -359,6 +368,15 @@ export const ProductFormPage = () => {
             onChange={setImages}
             onDraftUploaded={(imageId) => setSessionDraftIds((prev) => [...prev, imageId])}
             onUploadingChange={setIsUploadingImages}
+          />
+        </div>
+
+        <div className="border-t border-slate-100 pt-5">
+          <ProductSpecsEditor
+            description={formData.description || ''}
+            onDescriptionChange={(val) => setFormData((prev: any) => ({ ...prev, description: val }))}
+            specs={technicalSpecs}
+            onSpecsChange={setTechnicalSpecs}
           />
         </div>
 

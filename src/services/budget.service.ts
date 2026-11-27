@@ -9,6 +9,7 @@ export interface CreateBudgetPayload {
   items: BudgetCreateItem[];
   customerId?: string;
   paymentMethod?: 'MP' | 'MOBBEX' | 'TRANSFERENCIA';
+  installments?: number;
 }
 
 export interface CreateBudgetResponse {

@@ -15,12 +15,21 @@ export interface UpdateUserPayload {
   is_active?: boolean;
 }
 
+export interface CustomerLookupResult {
+  id: string;
+  dni: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  email: string;
+}
+
 export const UserService = {
   getMe: async () => {
     const response = await apiClient.get('users/me');
     return response.data;
   },
-  
+
   getSellers: async () => {
     const response = await apiClient.get('users/sellers');
     return response.data.data;
@@ -41,13 +50,24 @@ export const UserService = {
     return response.data;
   },
 
-  updateMe: async (data: { cbu_alias?: string }) => {
-    const response = await apiClient.patch('users/me', data);
-    return response.data;
+  updateMe: async (payload: {
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+    cbu_alias?: string;
+  }) => {
+    const { data } = await apiClient.patch('/users/me', payload);
+    return data;
   },
 
   changePassword: async (data: any) => {
     const response = await apiClient.post('users/me/password', data);
     return response.data;
-  }
+  },
+
+  findCustomerByDni: async (dni: string): Promise<CustomerLookupResult> => {
+    const cleanDni = dni.replace(/\D/g, '').trim();
+    const response = await apiClient.get(`users/customers/by-dni/${encodeURIComponent(cleanDni)}`);
+    return response.data.customer;
+  },
 };

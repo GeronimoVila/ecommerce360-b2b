@@ -5,7 +5,8 @@ import { ProductService } from '../../../services/product.service';
 import { MediaService } from '../../../services/media.service';
 import { CategoryCascader } from '../../../components/admin/catalog/CategoryCascader';
 import { ProductImageUploader } from '../../../components/admin/catalog/ProductImageUploader';
-import type { Product, ProductImage } from '../../../types/product';
+import { ProductSpecsEditor } from '../../../components/admin/catalog/ProductSpecsEditor';
+import type { Product, ProductImage, TechnicalSpecItem } from '../../../types/product';
 import { toast } from 'sonner';
 
 interface FieldErrors {
@@ -33,17 +34,20 @@ export const ComboFormPage = () => {
   const [formData, setFormData] = useState<{
     sku: string;
     name: string;
+    description: string;
     category_id: string;
     base_price: number | '';
     commission_rate: number | '';
   }>({
     sku: '',
     name: '',
+    description: '',
     category_id: '',
     base_price: 0,
     commission_rate: 0,
   });
 
+  const [technicalSpecs, setTechnicalSpecs] = useState<TechnicalSpecItem[]>([]);
   const [profitMarginInput, setProfitMarginInput] = useState<number | ''>(0);
   const [lastEditedPricingField, setLastEditedPricingField] = useState<'price' | 'margin'>('price');
 
@@ -74,10 +78,13 @@ export const ComboFormPage = () => {
           setFormData({
             sku: comboData.sku || '',
             name: comboData.name || '',
+            description: comboData.description || '',
             category_id: comboData.category_id || comboData.category?.id || '',
             base_price: loadedBasePrice,
             commission_rate: Number(comboData.commission_rate) || 0,
           });
+
+          setTechnicalSpecs(Array.isArray(comboData.technical_specs) ? comboData.technical_specs : []);
 
           if (comboData.combo_parts) {
             const mappedParts = comboData.combo_parts.map((cp: any) => ({
@@ -247,6 +254,10 @@ export const ComboFormPage = () => {
     const payload = {
       sku: formData.sku.trim().toUpperCase(),
       name: formData.name.trim(),
+      description: formData.description.trim() || null,
+      technical_specs: technicalSpecs
+        .map((s) => ({ key: s.key.trim(), value: s.value.trim() }))
+        .filter((s) => s.key && s.value),
       category_id: formData.category_id,
       base_price: Number(formData.base_price),
       commission_rate: Number(formData.commission_rate),
@@ -404,6 +415,15 @@ export const ComboFormPage = () => {
               onChange={setImages}
               onDraftUploaded={(imageId) => setSessionDraftIds((prev) => [...prev, imageId])}
               onUploadingChange={setIsUploadingImages}
+            />
+          </div>
+
+          <div className="border-t border-slate-100 pt-5">
+            <ProductSpecsEditor
+              description={formData.description}
+              onDescriptionChange={(val) => setFormData((prev) => ({ ...prev, description: val }))}
+              specs={technicalSpecs}
+              onSpecsChange={setTechnicalSpecs}
             />
           </div>
         </div>

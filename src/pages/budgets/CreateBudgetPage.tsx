@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ProductService } from '../../services/product.service';
 import { BudgetService } from '../../services/budget.service';
+import { PaymentRuleService, type PaymentRule } from '../../services/payment-rule.service';
+import { UserService, type CustomerLookupResult } from '../../services/user.service';
 import type { Product } from '../../types/product';
 import {
   Calculator,
@@ -14,6 +16,8 @@ import {
   User,
   AlertCircle,
   Ban,
+  X,
+  Loader2,
 } from 'lucide-react';
 
 interface CartItem {
@@ -48,26 +52,68 @@ function getEffectiveStock(product: Product): number {
   return Math.max(0, product.physical_stock ?? 0);
 }
 
+function resolveApplicableRule(
+  product: Product,
+  rules: PaymentRule[],
+  paymentMethod: 'MP' | 'MOBBEX' | 'TRANSFERENCIA',
+  installments: number
+): PaymentRule | null {
+  const matching = rules.filter(
+    (r) =>
+      r.is_active &&
+      r.payment_method === paymentMethod &&
+      Number(r.installments) === Number(installments)
+  );
+
+  if (matching.length === 0) return null;
+
+  const productRule = matching.find((r) => r.product_id === product.id);
+  if (productRule) return productRule;
+
+  if (product.category_id) {
+    const categoryRule = matching.find((r) => r.category_id === product.category_id);
+    if (categoryRule) return categoryRule;
+  }
+
+  const globalRule = matching.find((r) => r.is_global);
+  return globalRule || null;
+}
+
 export const CreateBudgetPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [paymentRules, setPaymentRules] = useState<PaymentRule[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [onlyInStock, setOnlyInStock] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'MP' | 'MOBBEX' | 'TRANSFERENCIA'>('MP');
-  const [customerId, setCustomerId] = useState('');
+  const [installments, setInstallments] = useState<number>(1);
+
+  const [dniInput, setDniInput] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerLookupResult | null>(null);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [customerLookupError, setCustomerLookupError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [createdBudget, setCreatedBudget] = useState<{ id: string; total: number; expiresAt: string } | null>(null);
+  const [createdBudget, setCreatedBudget] = useState<{
+    id: string;
+    total: number;
+    expiresAt: string;
+    paymentMethod: string;
+    installments: number;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const B2C_URL = import.meta.env.VITE_B2C_URL || 'http://localhost:3000';
 
   useEffect(() => {
-    ProductService.getPosCatalog('simple')
-      .then((res: any) => {
+    Promise.all([
+      ProductService.getPosCatalog('simple'),
+      PaymentRuleService.getAll().catch(() => [] as PaymentRule[]),
+    ])
+      .then(([res, rules]: [any, PaymentRule[]]) => {
         let extractedProducts: Product[] = [];
 
         if (Array.isArray(res)) {
@@ -82,6 +128,7 @@ export const CreateBudgetPage = () => {
         }
 
         setProducts(extractedProducts.filter((p) => p && p.is_active));
+        setPaymentRules(Array.isArray(rules) ? rules.filter((r) => r.is_active) : []);
       })
       .catch((err) => {
         console.error('[POS] Error cargando catálogo de productos:', err);
@@ -120,6 +167,88 @@ export const CreateBudgetPage = () => {
       return available <= 0 || item.quantity > available;
     });
   }, [cart]);
+
+  const availableInstallmentOptions = useMemo(() => {
+    if (paymentMethod === 'TRANSFERENCIA') {
+      return [{ installments: 1, label: '1 pago (Contado / Transferencia)' }];
+    }
+
+    const planSet = new Set<number>([1]);
+    for (const rule of paymentRules) {
+      if (rule.is_active && rule.payment_method === paymentMethod && Number(rule.installments) > 1) {
+        planSet.add(Number(rule.installments));
+      }
+    }
+
+    return Array.from(planSet)
+      .sort((a, b) => a - b)
+      .map((count) => {
+        if (count === 1) {
+          return { installments: 1, label: '1 pago' };
+        }
+        const globalRule = paymentRules.find(
+          (r) =>
+            r.is_active &&
+            r.is_global &&
+            r.payment_method === paymentMethod &&
+            Number(r.installments) === count
+        );
+        if (globalRule) {
+          const coeff = Number(globalRule.coefficient);
+          if (coeff === 1) {
+            return { installments: count, label: `${count} cuotas sin interés` };
+          }
+          if (coeff > 1) {
+            const pct = Math.round((coeff - 1) * 10000) / 100;
+            return { installments: count, label: `${count} cuotas (+${pct}% recargo)` };
+          }
+          const discountPct = Math.round((1 - coeff) * 10000) / 100;
+          return { installments: count, label: `${count} cuotas (-${discountPct}% OFF)` };
+        }
+        return { installments: count, label: `${count} cuotas (según regla activa)` };
+      });
+  }, [paymentMethod, paymentRules]);
+
+  const handlePaymentMethodChange = (nextMethod: 'MP' | 'MOBBEX' | 'TRANSFERENCIA') => {
+    setPaymentMethod(nextMethod);
+    if (nextMethod === 'TRANSFERENCIA') {
+      setInstallments(1);
+      return;
+    }
+
+    const hasSamePlan = paymentRules.some(
+      (r) =>
+        r.is_active &&
+        r.payment_method === nextMethod &&
+        Number(r.installments) === installments
+    );
+    if (!hasSamePlan) {
+      setInstallments(1);
+    }
+  };
+
+  const pricingSummary = useMemo(() => {
+    let baseTotal = 0;
+    let finalTotal = 0;
+
+    for (const item of cart) {
+      const basePrice = Number(item.product?.base_price) || 0;
+      const rule = resolveApplicableRule(item.product, paymentRules, paymentMethod, installments);
+      const coeff = rule ? Number(rule.coefficient) : 1;
+      const effectiveUnitPrice = Math.round(basePrice * coeff * 100) / 100;
+
+      baseTotal += basePrice * item.quantity;
+      finalTotal += effectiveUnitPrice * item.quantity;
+    }
+
+    baseTotal = Math.round(baseTotal * 100) / 100;
+    finalTotal = Math.round(finalTotal * 100) / 100;
+    const delta = Math.round((finalTotal - baseTotal) * 100) / 100;
+    const installmentAmount =
+      installments > 1 ? Math.round((finalTotal / installments) * 100) / 100 : finalTotal;
+
+    return { baseTotal, finalTotal, delta, installmentAmount };
+  }, [cart, paymentRules, paymentMethod, installments]);
 
   const handleAddToCart = (product: Product) => {
     setErrorMsg(null);
@@ -174,11 +303,27 @@ export const CreateBudgetPage = () => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
   };
 
-  const calculateTotal = () => {
-    return cart.reduce((acc, item) => {
-      const price = Number(item.product?.base_price) || 0;
-      return acc + price * item.quantity;
-    }, 0);
+  const handleSearchCustomerByDni = async () => {
+    const cleanDni = dniInput.replace(/\D/g, '').trim();
+    setCustomerLookupError(null);
+
+    if (cleanDni.length < 7 || cleanDni.length > 11) {
+      setCustomerLookupError('Ingresá un DNI válido (7 a 11 dígitos sin puntos).');
+      return;
+    }
+
+    setIsSearchingCustomer(true);
+    try {
+      const customer = await UserService.findCustomerByDni(cleanDni);
+      setSelectedCustomer(customer);
+      setDniInput('');
+    } catch (err: any) {
+      setSelectedCustomer(null);
+      const msg = err.response?.data?.error || 'No se encontró ningún cliente con ese DNI.';
+      setCustomerLookupError(msg);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
   };
 
   const handleCreateBudget = async () => {
@@ -197,10 +342,12 @@ export const CreateBudgetPage = () => {
 
     setIsSubmitting(true);
     try {
+      const effectiveInstallments = paymentMethod === 'TRANSFERENCIA' ? 1 : installments;
       const payload = {
         items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
         paymentMethod,
-        customerId: customerId.trim() || undefined,
+        installments: effectiveInstallments,
+        customerId: selectedCustomer?.id || undefined,
       };
 
       const res = await BudgetService.create(payload);
@@ -208,8 +355,13 @@ export const CreateBudgetPage = () => {
         id: res.budget.id,
         total: Number(res.budget.total_amount) || 0,
         expiresAt: res.budget.expires_at,
+        paymentMethod,
+        installments: effectiveInstallments,
       });
       setCart([]);
+      setSelectedCustomer(null);
+      setDniInput('');
+      setCustomerLookupError(null);
     } catch (error: any) {
       console.error('[POS Budget] Error:', error);
       const apiErr = error.response?.data?.details || error.response?.data?.error;
@@ -237,7 +389,7 @@ export const CreateBudgetPage = () => {
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Armador de Presupuestos (POS)</h1>
             <p className="text-sm text-slate-500 mt-1">
-              Selecciona productos con stock disponible, define la pasarela y genera un link de pago con 48h de validez.
+              Selecciona productos con stock disponible, define la pasarela y cuotas, y genera un link de pago con 48h de validez.
             </p>
           </div>
         </div>
@@ -473,47 +625,157 @@ export const CreateBudgetPage = () => {
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-100 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Método de Pago Sugerido
-                </label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as any)}
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white font-semibold text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm"
-                >
-                  <option value="MP">Mercado Pago (MP)</option>
-                  <option value="MOBBEX">Mobbex</option>
-                  <option value="TRANSFERENCIA">Transferencia Bancaria (Descuento 5%)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  ID Cliente B2C / Razón Social (Opcional)
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                    <User className="w-4 h-4" />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="UUID del cliente o Razón Social"
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full pl-10 pr-3 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono shadow-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl flex justify-between items-center">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <span className="text-xs font-bold text-indigo-900 block">TOTAL PRESUPUESTO</span>
-                  <span className="text-[10px] text-slate-500">Impuestos y logística incluidos</span>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Método de Pago
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => handlePaymentMethodChange(e.target.value as any)}
+                    className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white font-semibold text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm"
+                  >
+                    <option value="MP">Mercado Pago (MP)</option>
+                    <option value="MOBBEX">Mobbex</option>
+                    <option value="TRANSFERENCIA">Transferencia Bancaria</option>
+                  </select>
                 </div>
-                <span className="text-2xl font-black text-[#5B50D6] font-mono">
-                  ${calculateTotal().toLocaleString()}
-                </span>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Plan de Cuotas
+                  </label>
+                  <select
+                    value={installments}
+                    disabled={paymentMethod === 'TRANSFERENCIA'}
+                    onChange={(e) => setInstallments(Number(e.target.value) || 1)}
+                    className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white font-semibold text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm disabled:bg-slate-100 disabled:text-slate-500"
+                  >
+                    {availableInstallmentOptions.map((opt) => (
+                      <option key={opt.installments} value={opt.installments}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Cliente B2C por DNI (Opcional)
+                </label>
+
+                {selectedCustomer ? (
+                  <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-emerald-50/80 border border-emerald-200 text-emerald-950">
+                    <div className="min-w-0">
+                      <p className="text-xs font-extrabold truncate">
+                        {selectedCustomer.first_name} {selectedCustomer.last_name}
+                      </p>
+                      <p className="text-[11px] text-emerald-800 font-mono truncate">
+                        DNI {selectedCustomer.dni} · {selectedCustomer.email}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setCustomerLookupError(null);
+                      }}
+                      title="Quitar cliente asignado"
+                      className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-100 hover:text-rose-600 transition-colors shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                          <User className="w-4 h-4" />
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Ingresá DNI sin puntos (ej. 35123456)"
+                          value={dniInput}
+                          onChange={(e) => {
+                            setDniInput(e.target.value.replace(/\D/g, ''));
+                            if (customerLookupError) setCustomerLookupError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSearchCustomerByDni();
+                            }
+                          }}
+                          className="w-full pl-10 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono shadow-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSearchCustomerByDni}
+                        disabled={isSearchingCustomer || !dniInput.trim()}
+                        className="px-4 py-2.5 rounded-xl bg-[#1A1D27] text-white text-xs font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 shrink-0"
+                      >
+                        {isSearchingCustomer ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Search className="w-3.5 h-3.5" />
+                        )}
+                        Buscar
+                      </button>
+                    </div>
+
+                    {customerLookupError && (
+                      <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        {customerLookupError}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl space-y-2">
+                {pricingSummary.delta !== 0 && (
+                  <>
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>Subtotal de lista:</span>
+                      <span className="font-mono">${pricingSummary.baseTotal.toLocaleString()}</span>
+                    </div>
+                    <div
+                      className={`flex justify-between text-xs font-bold ${
+                        pricingSummary.delta < 0 ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      <span>
+                        {pricingSummary.delta < 0
+                          ? 'Descuento por medio de pago:'
+                          : `Costo financiero (${installments} cuotas):`}
+                      </span>
+                      <span className="font-mono">
+                        {pricingSummary.delta < 0
+                          ? `-$${Math.abs(pricingSummary.delta).toLocaleString()}`
+                          : `+$${pricingSummary.delta.toLocaleString()}`}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex justify-between items-center pt-1">
+                  <div>
+                    <span className="text-xs font-bold text-indigo-900 block">TOTAL PRESUPUESTO</span>
+                    <span className="text-[10px] text-slate-500">
+                      {installments > 1
+                        ? `${installments} cuotas de $${pricingSummary.installmentAmount.toLocaleString()}`
+                        : 'Impuestos y logística incluidos'}
+                    </span>
+                  </div>
+                  <span className="text-2xl font-black text-[#5B50D6] font-mono">
+                    ${pricingSummary.finalTotal.toLocaleString()}
+                  </span>
+                </div>
               </div>
 
               <button
@@ -553,6 +815,13 @@ export const CreateBudgetPage = () => {
                 <div className="flex justify-between text-xs text-slate-600">
                   <span>ID Presupuesto:</span>
                   <span className="font-mono font-bold text-slate-900">{createdBudget.id}</span>
+                </div>
+                <div className="flex justify-between text-xs text-slate-600">
+                  <span>Condición elegida:</span>
+                  <span className="font-bold text-slate-900">
+                    {createdBudget.paymentMethod}
+                    {createdBudget.installments > 1 ? ` · ${createdBudget.installments} cuotas` : ''}
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs text-slate-600">
                   <span>Monto Total:</span>

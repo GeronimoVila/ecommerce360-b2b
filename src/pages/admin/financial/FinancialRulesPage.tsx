@@ -28,9 +28,10 @@ export const FinancialRulesPage = () => {
     try {
       setIsLoadingRules(true);
       const data = await PaymentRuleService.getAll();
-      setRules(data);
-    } catch (error) {
+      setRules(Array.isArray(data) ? data : []);
+    } catch (error: any) {
       console.error('Error cargando reglas:', error);
+      toast.error(error?.response?.data?.error || 'Error al cargar las reglas de pago.');
     } finally {
       setIsLoadingRules(false);
     }
@@ -40,9 +41,10 @@ export const FinancialRulesPage = () => {
     try {
       setIsLoadingCoupons(true);
       const data = await CouponService.getAll();
-      setCoupons(data);
-    } catch (error) {
+      setCoupons(Array.isArray(data) ? data : []);
+    } catch (error: any) {
       console.error('Error cargando cupones:', error);
+      toast.error(error?.response?.data?.error || 'Error al cargar los cupones.');
     } finally {
       setIsLoadingCoupons(false);
     }
@@ -222,62 +224,79 @@ export const FinancialRulesPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
-                  {rules.map((rule) => (
-                    <tr
-                      key={rule.id}
-                      className={`hover:bg-slate-50/50 transition-colors ${
-                        !rule.is_active ? 'opacity-60 bg-slate-50/40' : ''
-                      }`}
-                    >
-                      <td className="py-4 px-6 font-bold text-slate-900">{rule.payment_method}</td>
-                      <td className="py-4 px-6 font-semibold text-slate-700">
-                        {rule.installments} {rule.installments === 1 ? 'pago' : 'cuotas'}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-mono bg-indigo-50/80 text-[#5B50D6] border border-indigo-100 px-2.5 py-1 rounded-lg font-bold text-xs">
-                          x {Number(rule.coefficient).toFixed(4)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">{renderScope(rule)}</td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg border ${
-                            rule.is_active
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : 'bg-rose-50 text-rose-700 border-rose-200'
-                          }`}
-                        >
+                  {rules.map((rule) => {
+                    const coeff = Number(rule.coefficient);
+                    const pct = Math.round(Math.abs(1 - coeff) * 100);
+
+                    return (
+                      <tr
+                        key={rule.id}
+                        className={`hover:bg-slate-50/50 transition-colors ${
+                          !rule.is_active ? 'opacity-60 bg-slate-50/40' : ''
+                        }`}
+                      >
+                        <td className="py-4 px-6 font-bold text-slate-900">{rule.payment_method}</td>
+                        <td className="py-4 px-6 font-semibold text-slate-700">
+                          {rule.installments} {rule.installments === 1 ? 'pago' : 'cuotas'}
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono bg-indigo-50/80 text-[#5B50D6] border border-indigo-100 px-2.5 py-1 rounded-lg font-bold text-xs">
+                              x {coeff.toFixed(4)}
+                            </span>
+                            {coeff < 1 && (
+                              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                -{pct}% DTO
+                              </span>
+                            )}
+                            {coeff > 1 && (
+                              <span className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                                +{pct}% recargo
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">{renderScope(rule)}</td>
+                        <td className="py-4 px-6">
                           <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              rule.is_active ? 'bg-emerald-500' : 'bg-rose-500'
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg border ${
+                              rule.is_active
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
                             }`}
-                          ></span>
-                          {rule.is_active ? 'Activa' : 'Inactiva'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-right space-x-3">
-                        <button
-                          onClick={() => {
-                            setRuleToEdit(rule);
-                            setIsRuleModalOpen(true);
-                          }}
-                          className="text-[#5B50D6] hover:text-indigo-800 font-semibold text-xs transition-colors"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleToggleRuleStatus(rule)}
-                          className={`font-semibold text-xs transition-colors ${
-                            rule.is_active
-                              ? 'text-rose-600 hover:text-rose-800'
-                              : 'text-emerald-600 hover:text-emerald-800'
-                          }`}
-                        >
-                          {rule.is_active ? 'Desactivar' : 'Reactivar'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                rule.is_active ? 'bg-emerald-500' : 'bg-rose-500'
+                              }`}
+                            ></span>
+                            {rule.is_active ? 'Activa' : 'Inactiva'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right space-x-3">
+                          <button
+                            onClick={() => {
+                              setRuleToEdit(rule);
+                              setIsRuleModalOpen(true);
+                            }}
+                            className="text-[#5B50D6] hover:text-indigo-800 font-semibold text-xs transition-colors"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleToggleRuleStatus(rule)}
+                            className={`font-semibold text-xs transition-colors ${
+                              rule.is_active
+                                ? 'text-rose-600 hover:text-rose-800'
+                                : 'text-emerald-600 hover:text-emerald-800'
+                            }`}
+                          >
+                            {rule.is_active ? 'Desactivar' : 'Reactivar'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -1,15 +1,38 @@
 import { useState, useEffect } from 'react';
-import { 
-  User, Lock, Copy, CheckCircle2, Edit3, 
-  ShieldCheck, Wallet, X 
+import {
+  User,
+  Lock,
+  Copy,
+  CheckCircle2,
+  Edit3,
+  ShieldCheck,
+  Wallet,
+  Mail,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserService } from '../../services/user.service';
+import { useAuthStore } from '../../store/authStore';
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Administrador Activo',
+  SELLER: 'Vendedor Activo',
+  LOGISTICS: 'Operador Logístico Activo',
+};
 
 export const MyProfilePage = () => {
+  const { checkSession } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  const [isEditingAccount, setIsEditingAccount] = useState(false);
+  const [accountForm, setAccountForm] = useState({
+    email: '',
+    first_name: '',
+    last_name: '',
+  });
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
 
   const [isEditingCBU, setIsEditingCBU] = useState(false);
   const [cbuValue, setCbuValue] = useState('');
@@ -23,8 +46,13 @@ export const MyProfilePage = () => {
 
   const fetchProfile = () => {
     UserService.getMe()
-      .then(data => {
+      .then((data) => {
         setProfile(data);
+        setAccountForm({
+          email: data.email || '',
+          first_name: data.seller_profile?.first_name || '',
+          last_name: data.seller_profile?.last_name || '',
+        });
         setCbuValue(data.seller_profile?.cbu_alias || '');
       })
       .catch(() => toast.error('Error cargando tu perfil.'))
@@ -42,6 +70,35 @@ export const MyProfilePage = () => {
     setCopied(true);
     toast.success('Link de afiliado copiado al portapapeles.');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSaveAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accountForm.email.trim()) {
+      toast.warning('El correo electrónico es obligatorio.');
+      return;
+    }
+
+    setIsSavingAccount(true);
+    try {
+      const payload: Record<string, string> = {
+        email: accountForm.email.trim(),
+      };
+      if (profile.role === 'SELLER') {
+        payload.first_name = accountForm.first_name.trim();
+        payload.last_name = accountForm.last_name.trim();
+      }
+
+      await UserService.updateMe(payload);
+      setIsEditingAccount(false);
+      await checkSession();
+      fetchProfile();
+      toast.success('Datos de cuenta actualizados correctamente.');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Error guardando tus datos.');
+    } finally {
+      setIsSavingAccount(false);
+    }
   };
 
   const handleSaveCBU = async () => {
@@ -77,7 +134,7 @@ export const MyProfilePage = () => {
     try {
       await UserService.changePassword({
         current_password: passwordData.current,
-        new_password: passwordData.new
+        new_password: passwordData.new,
       });
       toast.success('Contraseña actualizada correctamente. Tu cuenta es segura.');
       setIsPasswordModalOpen(false);
@@ -105,9 +162,15 @@ export const MyProfilePage = () => {
     );
   }
 
+  const isSeller = profile.role === 'SELLER';
+  const displayName = isSeller
+    ? `${profile.seller_profile?.first_name || ''} ${profile.seller_profile?.last_name || ''}`.trim() || profile.email
+    : profile.role === 'ADMIN'
+    ? 'Administrador del Sistema'
+    : 'Operador de Logística';
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 bg-[#F8FAFC] min-h-full font-sans text-slate-900 relative">
-      
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-[#5B50D6] flex items-center justify-center shrink-0">
@@ -115,116 +178,214 @@ export const MyProfilePage = () => {
           </div>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Mi Perfil</h1>
-            <p className="text-sm text-slate-500 mt-1">Configura tus datos comerciales, link de referidos y seguridad de cuenta.</p>
+            <p className="text-sm text-slate-500 mt-1">
+              {isSeller
+                ? 'Configura tus datos comerciales, link de referidos y seguridad de cuenta.'
+                : 'Gestiona tus datos de acceso y la seguridad de tu cuenta.'}
+            </p>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => setIsPasswordModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#1A1D27] text-white rounded-xl text-sm font-bold shadow-sm hover:bg-slate-800 transition-colors w-full md:w-auto"
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1A1D27] text-white rounded-xl text-sm font-bold shadow-sm hover:bg-slate-800 transition-colors w-full md:w-auto"
         >
           <Lock className="w-4 h-4" /> Cambiar Contraseña
         </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        
         <div className="bg-[#1A1D27] p-6 md:p-8 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">
-              {profile.seller_profile?.first_name} {profile.seller_profile?.last_name}
-            </h2>
+            <h2 className="text-2xl font-bold tracking-tight">{displayName}</h2>
             <p className="text-slate-400 text-sm mt-1">{profile.email}</p>
           </div>
           <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            Vendedor Activo
+            {ROLE_LABELS[profile.role] || profile.role}
           </span>
         </div>
-        
-        <div className="p-6 md:p-8 space-y-6">
-          
-          <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="space-y-1 overflow-hidden">
-              <p className="text-xs font-bold text-[#5B50D6] uppercase tracking-wider flex items-center gap-1.5">
-                <Copy className="w-3.5 h-3.5" /> Tu Link de Ventas (Afiliado)
-              </p>
-              <p className="text-sm font-mono text-slate-700 bg-white/80 border border-indigo-100/60 px-3 py-2 rounded-xl break-all">
-                {B2C_URL}?ref={profile.id}
-              </p>
-            </div>
-            <button 
-              onClick={handleCopyLink}
-              className="whitespace-nowrap px-5 py-2.5 bg-[#5B50D6] text-white font-bold text-xs rounded-xl shadow-sm hover:bg-indigo-700 transition-all flex items-center gap-1.5 shrink-0"
-            >
-              {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? '¡Copiado!' : 'Copiar Link'}
-            </button>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            
-            <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 flex flex-col justify-center space-y-1">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Código Interno (Ref Code)</p>
-              <p className="text-lg font-mono font-bold text-slate-900">
-                {profile.seller_profile?.ref_code || 'N/A'}
+        <div className="p-6 md:p-8 space-y-6">
+          <div className="border border-slate-200 rounded-2xl p-5 bg-white shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-[#5B50D6]" /> Datos de la Cuenta
               </p>
-            </div>
-            
-            <div className="border border-slate-200 rounded-2xl p-5 bg-white flex flex-col justify-between space-y-3 shadow-sm">
-              <div className="flex justify-between items-start">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5" /> CBU / Alias (Para cobros)
-                </p>
-                {!isEditingCBU && (
-                  <button 
-                    onClick={() => setIsEditingCBU(true)} 
-                    className="text-[#5B50D6] text-xs font-bold hover:text-indigo-800 transition-colors flex items-center gap-1"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" /> Editar
-                  </button>
-                )}
-              </div>
-              
-              {isEditingCBU ? (
-                <div className="space-y-3">
-                  <input 
-                    type="text" 
-                    value={cbuValue} 
-                    onChange={(e) => setCbuValue(e.target.value)} 
-                    placeholder="Ingresa tu CBU o Alias"
-                    className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono shadow-sm outline-none transition-colors"
-                  />
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={handleSaveCBU} 
-                      disabled={isSavingCBU} 
-                      className="bg-[#5B50D6] text-white px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:bg-indigo-700 transition-colors"
-                    >
-                      {isSavingCBU ? 'Guardando...' : 'Guardar CBU'}
-                    </button>
-                    <button 
-                      onClick={() => { setIsEditingCBU(false); setCbuValue(profile.seller_profile?.cbu_alias || ''); }} 
-                      className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-base font-mono font-semibold text-slate-900">
-                  {profile.seller_profile?.cbu_alias || <span className="text-slate-400 italic text-sm font-sans">No configurado</span>}
-                </p>
+              {!isEditingAccount && (
+                <button
+                  onClick={() => setIsEditingAccount(true)}
+                  className="text-[#5B50D6] text-xs font-bold hover:text-indigo-800 transition-colors flex items-center gap-1"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Editar Datos
+                </button>
               )}
             </div>
 
+            {isEditingAccount ? (
+              <form onSubmit={handleSaveAccount} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {isSeller && (
+                    <>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Nombre
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={accountForm.first_name}
+                          onChange={(e) =>
+                            setAccountForm({ ...accountForm, first_name: e.target.value })
+                          }
+                          className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Apellido
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={accountForm.last_name}
+                          onChange={(e) =>
+                            setAccountForm({ ...accountForm, last_name: e.target.value })
+                          }
+                          className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] outline-none"
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div className={isSeller ? 'md:col-span-2' : 'md:col-span-2'}>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Correo Electrónico de Acceso
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={accountForm.email}
+                      onChange={(e) =>
+                        setAccountForm({ ...accountForm, email: e.target.value })
+                      }
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingAccount}
+                    className="bg-[#5B50D6] text-white px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:bg-indigo-700 transition-colors"
+                  >
+                    {isSavingAccount ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingAccount(false);
+                      setAccountForm({
+                        email: profile.email || '',
+                        first_name: profile.seller_profile?.first_name || '',
+                        last_name: profile.seller_profile?.last_name || '',
+                      });
+                    }}
+                    className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                {isSeller && (
+                  <>
+                    <div>
+                      <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        Nombre y Apellido
+                      </span>
+                      <span className="font-semibold text-slate-900">
+                        {profile.seller_profile?.first_name} {profile.seller_profile?.last_name}
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div>
+                  <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    Correo Electrónico
+                  </span>
+                  <span className="font-semibold text-slate-900">{profile.email}</span>
+                </div>
+              </div>
+            )}
           </div>
+
+          {isSeller && (
+            <>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="border border-slate-200 rounded-2xl p-5 bg-white flex flex-col justify-between space-y-3 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5" /> CBU / Alias (Para cobros)
+                    </p>
+                    {!isEditingCBU && (
+                      <button
+                        onClick={() => setIsEditingCBU(true)}
+                        className="text-[#5B50D6] text-xs font-bold hover:text-indigo-800 transition-colors flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditingCBU ? (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={cbuValue}
+                        onChange={(e) => setCbuValue(e.target.value)}
+                        placeholder="Ingresa tu CBU o Alias"
+                        className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] font-mono shadow-sm outline-none transition-colors"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveCBU}
+                          disabled={isSavingCBU}
+                          className="bg-[#5B50D6] text-white px-4 py-2 rounded-xl text-xs font-bold disabled:opacity-50 shadow-sm hover:bg-indigo-700 transition-colors"
+                        >
+                          {isSavingCBU ? 'Guardando...' : 'Guardar CBU'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsEditingCBU(false);
+                            setCbuValue(profile.seller_profile?.cbu_alias || '');
+                          }}
+                          className="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-base font-mono font-semibold text-slate-900">
+                      {profile.seller_profile?.cbu_alias || (
+                        <span className="text-slate-400 italic text-sm font-sans">
+                          No configurado
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {isPasswordModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
-            
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/70">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#5B50D6] flex items-center justify-center">
@@ -232,55 +393,66 @@ export const MyProfilePage = () => {
                 </div>
                 <h2 className="text-base font-bold text-slate-900">Seguridad de la Cuenta</h2>
               </div>
-              <button 
-                onClick={() => setIsPasswordModalOpen(false)} 
+              <button
+                onClick={() => setIsPasswordModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handlePasswordSubmit} noValidate className="p-6 space-y-4">
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contraseña Actual *</label>
-                <input 
-                  type="password" required 
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors" 
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Contraseña Actual *
+                </label>
+                <input
+                  type="password"
+                  required
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors"
                   value={passwordData.current}
-                  onChange={e => setPasswordData({...passwordData, current: e.target.value})} 
+                  onChange={(e) => setPasswordData({ ...passwordData, current: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nueva Contraseña *</label>
-                <input 
-                  type="password" required minLength={8}
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors" 
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Nueva Contraseña *
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors"
                   value={passwordData.new}
-                  onChange={e => setPasswordData({...passwordData, new: e.target.value})} 
+                  onChange={(e) => setPasswordData({ ...passwordData, new: e.target.value })}
                   placeholder="Mínimo 8 caracteres"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Confirmar Nueva Contraseña *</label>
-                <input 
-                  type="password" required minLength={8}
-                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors" 
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Confirmar Nueva Contraseña *
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  className="w-full border border-slate-200 rounded-xl p-3 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] shadow-sm outline-none transition-colors"
                   value={passwordData.confirm}
-                  onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} 
+                  onChange={(e) => setPasswordData({ ...passwordData, confirm: e.target.value })}
                 />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
-                <button 
-                  type="button" 
-                  onClick={() => setIsPasswordModalOpen(false)} 
+                <button
+                  type="button"
+                  onClick={() => setIsPasswordModalOpen(false)}
                   className="px-5 py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
-                  disabled={isSavingPassword} 
+                <button
+                  type="submit"
+                  disabled={isSavingPassword}
                   className="px-5 py-2.5 text-sm font-bold text-white bg-[#5B50D6] rounded-xl hover:bg-indigo-700 disabled:opacity-50 shadow-sm shadow-indigo-600/25 transition-all"
                 >
                   {isSavingPassword ? 'Actualizando...' : 'Actualizar Clave'}

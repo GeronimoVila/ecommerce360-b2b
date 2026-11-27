@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { X, Sliders } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Sliders, Search, Check } from 'lucide-react';
 import { PaymentRuleService, type PaymentRulePayload, type PaymentRule } from '../../../services/payment-rule.service';
 import { CategoryService } from '../../../services/category.service';
+import { ProductService } from '../../../services/product.service';
+import type { Product } from '../../../types/product';
 import { toast } from 'sonner';
 
 interface PaymentRuleModalProps {
@@ -23,14 +25,24 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
 
   const [targetType, setTargetType] = useState<'GLOBAL' | 'CATEGORY' | 'PRODUCT'>('GLOBAL');
   const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; label: string }>>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productSearch, setProductSearch] = useState('');
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      CategoryService.getTree(true)
-        .then((tree) => setCategoryOptions(CategoryService.flattenTree(tree)))
-        .catch((err) => console.error('[PaymentRuleModal] Error cargando categorías:', err));
-    }
+    if (!isOpen) return;
+
+    CategoryService.getTree(true)
+      .then((tree) => setCategoryOptions(CategoryService.flattenTree(tree)))
+      .catch((err) => console.error('[PaymentRuleModal] Error cargando categorías:', err));
+
+    setIsLoadingProducts(true);
+    ProductService.getAdminCatalog()
+      .then((list) => setProducts(Array.isArray(list) ? list : []))
+      .catch((err) => console.error('[PaymentRuleModal] Error cargando productos:', err))
+      .finally(() => setIsLoadingProducts(false));
   }, [isOpen]);
 
   useEffect(() => {
@@ -56,8 +68,37 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
         product_id: ''
       });
       setTargetType('GLOBAL');
+      setProductSearch('');
     }
+    setIsProductDropdownOpen(false);
   }, [ruleToEdit, isOpen]);
+
+  useEffect(() => {
+    if (ruleToEdit?.product_id && products.length > 0) {
+      const matched = products.find((p) => p.id === ruleToEdit.product_id);
+      if (matched) {
+        setProductSearch(matched.name);
+      }
+    }
+  }, [ruleToEdit, products]);
+
+  const selectedProduct = useMemo(
+    () => products.find((p) => p.id === formData.product_id) || null,
+    [products, formData.product_id]
+  );
+
+  const filteredProducts = useMemo(() => {
+    const term = productSearch.trim().toLowerCase();
+    const activeList = products.filter((p) => p.is_active !== false);
+    if (!term) return activeList.slice(0, 50);
+    return activeList
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(term) ||
+          (p.sku && p.sku.toLowerCase().includes(term))
+      )
+      .slice(0, 50);
+  }, [products, productSearch]);
 
   if (!isOpen) return null;
 
@@ -78,6 +119,19 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
       category_id: type === 'CATEGORY' ? prev.category_id : '',
       product_id: type === 'PRODUCT' ? prev.product_id : ''
     }));
+    if (type !== 'PRODUCT') {
+      setProductSearch('');
+      setIsProductDropdownOpen(false);
+    }
+  };
+
+  const handleSelectProduct = (product: Product) => {
+    setFormData((prev) => ({
+      ...prev,
+      product_id: product.id
+    }));
+    setProductSearch(product.name);
+    setIsProductDropdownOpen(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,7 +142,7 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
       return;
     }
     if (targetType === 'PRODUCT' && !formData.product_id) {
-      toast.warning('Debes proporcionar un ID de producto.');
+      toast.warning('Debes seleccionar un producto de la lista.');
       return;
     }
 
@@ -119,8 +173,8 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm font-sans">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-visible border border-slate-200">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/70 rounded-t-2xl">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-50 text-[#5B50D6] flex items-center justify-center">
               <Sliders className="w-4 h-4" />
@@ -203,7 +257,7 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
               >
                 <option value="GLOBAL">Global (Aplica a todo el catálogo)</option>
                 <option value="CATEGORY">Específica de Categoría</option>
-                <option value="PRODUCT">Específica de Producto (SKU)</option>
+                <option value="PRODUCT">Específica de Producto</option>
               </select>
             </div>
 
@@ -234,20 +288,82 @@ export const PaymentRuleModal = ({ isOpen, onClose, onSuccess, ruleToEdit }: Pay
             )}
 
             {targetType === 'PRODUCT' && (
-              <div>
+              <div className="relative">
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  ID de Producto *
+                  Seleccionar Producto *
                 </label>
-                <input
-                  type="text"
-                  name="product_id"
-                  value={formData.product_id || ''}
-                  onChange={handleChange}
-                  disabled={!!ruleToEdit}
-                  required
-                  placeholder="UUID del producto"
-                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] disabled:bg-slate-100 font-mono shadow-sm"
-                />
+
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onFocus={() => !ruleToEdit && setIsProductDropdownOpen(true)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setProductSearch(val);
+                      setIsProductDropdownOpen(true);
+                      if (selectedProduct && selectedProduct.name !== val) {
+                        setFormData((prev) => ({ ...prev, product_id: '' }));
+                      }
+                    }}
+                    disabled={!!ruleToEdit}
+                    placeholder={isLoadingProducts ? 'Cargando productos...' : 'Buscar producto por nombre o SKU...'}
+                    className="w-full border border-slate-200 rounded-xl pl-9 pr-9 py-2.5 text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] disabled:bg-slate-100 disabled:text-slate-500 shadow-sm"
+                  />
+                  {!ruleToEdit && productSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductSearch('');
+                        setFormData((prev) => ({ ...prev, product_id: '' }));
+                        setIsProductDropdownOpen(true);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {selectedProduct && (
+                  <p className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" />
+                    Seleccionado: {selectedProduct.name} {selectedProduct.sku ? `(SKU: ${selectedProduct.sku})` : ''}
+                  </p>
+                )}
+
+                {!ruleToEdit && isProductDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100">
+                    {filteredProducts.length === 0 ? (
+                      <div className="px-3.5 py-3 text-xs text-slate-400 text-center">
+                        No se encontraron productos con "{productSearch}".
+                      </div>
+                    ) : (
+                      filteredProducts.map((product) => {
+                        const isSelected = product.id === formData.product_id;
+                        return (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => handleSelectProduct(product)}
+                            className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between hover:bg-indigo-50/70 transition-colors ${
+                              isSelected ? 'bg-indigo-50 text-[#5B50D6] font-bold' : 'text-slate-800'
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <p className="font-semibold truncate">{product.name}</p>
+                              {product.sku && (
+                                <p className="text-[10px] font-mono text-slate-400">SKU: {product.sku}</p>
+                              )}
+                            </div>
+                            {isSelected && <Check className="w-4 h-4 text-[#5B50D6] shrink-0" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

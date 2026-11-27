@@ -6,12 +6,18 @@ export interface ProductImage {
   is_primary: boolean;
 }
 
+export interface TechnicalSpecItem {
+  key: string;
+  value: string;
+}
+
 export interface Product {
   is_combo: boolean;
   id: string;
   sku: string;
   name: string;
-  description?: string;
+  description?: string | null;
+  technical_specs?: TechnicalSpecItem[] | null;
   base_price: number;
   purchase_cost: number;
   vat_rate: number;
@@ -44,6 +50,8 @@ export interface Product {
 export interface ProductFormData {
   sku: string;
   name: string;
+  description?: string | null;
+  technical_specs?: TechnicalSpecItem[];
   category_id: string;
   purchase_cost: number;
   vat_rate: number;

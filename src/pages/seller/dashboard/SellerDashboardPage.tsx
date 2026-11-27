@@ -3,8 +3,7 @@ import { apiClient } from '../../../services/apiClient';
 import { useAuthStore } from '../../../store/authStore';
 import { 
   Wallet, Mail, Hourglass, CheckCircle2, 
-  CalendarX, Star, AlertCircle, Copy, CheckCircle, 
-  Eye, Filter, Share2 
+  CalendarX, Star, AlertCircle, Eye, Filter
 } from 'lucide-react';
 
 interface DashboardData {
@@ -40,15 +39,13 @@ interface SaleDTO {
 
 
 export default function SellerDashboardPage() {
-  const { user } = useAuthStore();
+  useAuthStore();
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [sales, setSales] = useState<SaleDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  
-  const B2C_URL = import.meta.env.VITE_B2C_URL || 'http://localhost:3000';
+  const [] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -80,15 +77,6 @@ export default function SellerDashboardPage() {
 
     fetchDashboardData();
   }, []);
-
-  const sellerRefCode = user?.id || dashboardData?.seller_id || 'SIN-REF';
-  const referralLink = `${B2C_URL}?ref=${sellerRefCode}`;
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   if (loading) {
     return (
@@ -208,9 +196,8 @@ export default function SellerDashboardPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        <section className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm flex flex-col">
+      <div className="grid grid-cols-1 gap-6">
+        <section className="w-full bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm flex flex-col">
           <div className="flex items-start justify-between mb-5">
             <div className="flex gap-3">
               <div className="mt-1">
@@ -230,11 +217,11 @@ export default function SellerDashboardPage() {
 
           <div className="space-y-3 flex-1">
             {urgentActions.length === 0 ? (
-               <div className="p-8 text-center bg-emerald-50/50 rounded-xl border border-emerald-100">
-                 <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-                 <p className="text-sm font-semibold text-emerald-800">¡Todo al día!</p>
-                 <p className="text-xs text-emerald-600 mt-1">No tienes presupuestos próximos a vencer.</p>
-               </div>
+              <div className="p-8 text-center bg-emerald-50/50 rounded-xl border border-emerald-100">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-emerald-800">¡Todo al día!</p>
+                <p className="text-xs text-emerald-600 mt-1">No tienes presupuestos próximos a vencer.</p>
+              </div>
             ) : (
               urgentActions.map(action => (
                 <div key={action.id} className="bg-rose-50/50 border border-rose-100 p-4 rounded-xl flex justify-between items-center group hover:bg-rose-50 transition-colors">
@@ -260,40 +247,6 @@ export default function SellerDashboardPage() {
                 </div>
               ))
             )}
-          </div>
-        </section>
-
-        <section className="bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-1.5 bg-indigo-50 rounded-lg text-[#5B50D6]">
-                <Share2 className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-900 text-lg">Tu Enlace de Atribución Comercial</h3>
-            </div>
-            <p className="text-sm text-slate-500 mb-5 leading-relaxed">
-              Comparte este enlace para que las compras de clientes B2B se asocien automáticamente a tu CUIT y comisión.
-            </p>
-            
-            <div className="relative mb-6">
-              <input 
-                type="text" 
-                readOnly 
-                value={referralLink}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 pl-4 pr-10 text-sm font-mono text-slate-600 outline-none shadow-inner"
-              />
-              <Copy className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2" />
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button 
-              onClick={handleCopyLink}
-              className="flex-1 bg-[#5B50D6] text-white py-3 rounded-xl font-bold shadow-sm hover:bg-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm"
-            >
-              {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? '¡Copiado!' : 'Copiar Link'}
-            </button>
           </div>
         </section>
       </div>

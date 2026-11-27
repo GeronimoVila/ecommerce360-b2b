@@ -50,7 +50,7 @@ const STATUS_META: Record<
   },
   PAID: {
     label: 'Pagada (A preparar)',
-    actionLabel: 'Volver a Pagada',
+    actionLabel: 'Marcar Pagada',
     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
     dotClass: 'bg-amber-500',
     buttonClass: 'bg-amber-600 hover:bg-amber-700 text-white',
@@ -269,6 +269,7 @@ export const SalesManagementPage = () => {
     statusFilter !== '' ||
     (isAdmin && (attributionFilter !== 'ALL' || selectedSellerId !== ''));
 
+  const pendingPaymentCount = orders.filter((o) => o.status === 'PENDING').length;
   const paidCount = orders.filter((o) => o.status === 'PAID').length;
   const shippedCount = orders.filter((o) => o.status === 'SHIPPED').length;
   const deliveredCount = orders.filter((o) => o.status === 'DELIVERED').length;
@@ -305,18 +306,27 @@ export const SalesManagementPage = () => {
             <p className="text-sm text-slate-500 mt-1">
               {isAdmin
                 ? 'Monitoreo de todas las órdenes, origen de atribución (vendedor vs. tienda directa) y estados logísticos.'
-                : 'Consulta tus operaciones confirmadas y márcalas como enviadas o entregadas directamente.'}
+                : 'Consulta tus operaciones pendientes o confirmadas y márcalas como enviadas o entregadas.'}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             Total Operaciones
           </p>
           <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{totalCount}</p>
+        </div>
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Pend. de Pago
+            </p>
+            <Clock className="w-4 h-4 text-slate-400" />
+          </div>
+          <p className="text-2xl font-black text-slate-900 mt-1 font-mono">{pendingPaymentCount}</p>
         </div>
         <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
@@ -401,11 +411,11 @@ export const SalesManagementPage = () => {
             }}
             className="px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:ring-2 focus:ring-[#5B50D6]/20 focus:border-[#5B50D6] outline-none shadow-sm cursor-pointer"
           >
-            <option value="">Todas confirmadas</option>
+            <option value="">Todas las órdenes</option>
+            <option value="PENDING">Pendiente de Pago</option>
             <option value="PAID">Pagada (A preparar)</option>
             <option value="SHIPPED">Enviada</option>
             <option value="DELIVERED">Entregada</option>
-            {isAdmin && <option value="PENDING">Pendiente de Pago</option>}
             {isAdmin && <option value="BUDGET">Presupuesto</option>}
             {isAdmin && <option value="CANCELED">Cancelada</option>}
           </select>
@@ -488,7 +498,7 @@ export const SalesManagementPage = () => {
             <p className="text-xs text-slate-400">
               {hasActiveFilters
                 ? 'Intenta limpiar los filtros para ver el historial completo.'
-                : 'Las órdenes confirmadas aparecerán aquí automáticamente.'}
+                : 'Las órdenes registradas aparecerán aquí automáticamente.'}
             </p>
           </div>
         ) : (

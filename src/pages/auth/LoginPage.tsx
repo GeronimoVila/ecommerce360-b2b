@@ -82,7 +82,7 @@ export const LoginPage = () => {
           <div className="h-10 w-10 rounded-xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <Zap className="w-6 h-6 text-white fill-white" />
           </div>
-          <span className="text-xl font-bold tracking-wider">ELECTROTECH</span>
+          <span className="text-xl font-bold tracking-wider">LEGADO HOGAR</span>
         </div>
 
         <div className="max-w-xl mt-8">
@@ -296,7 +296,7 @@ export const LoginPage = () => {
               Mesa de Ayuda Técnica
             </a>
           </p>
-          <p>© 2026 ELECTROTECH Systems Inc. Todos los derechos reservados.</p>
+          <p>© 2026 LEGADO HOGAR Systems Inc. Todos los derechos reservados.</p>
         </div>
       </div>
     </div>

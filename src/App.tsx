@@ -5,6 +5,7 @@ import { useAuthStore } from './store/authStore';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { PortalLayout } from './components/layout/PortalLayout';
 import { LoginPage } from './pages/auth/LoginPage';
+import StorefrontSettingsPage from './pages/admin/storefront/StorefrontSettingsPage';
 
 const SellerDashboardPage = lazy(() => import('./pages/seller/dashboard/SellerDashboardPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/dashboard/AdminDashboardPage'));
@@ -48,7 +49,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
 
-            <Route element={<ProtectedRoute allowedRoles={['SELLER', 'ADMIN']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['SELLER', 'ADMIN', 'LOGISTICS']} />}>
               <Route element={<PortalLayout />}>
                 <Route path="/portal/dashboard" element={<SellerDashboardPage />} />
                 <Route path="/portal/profile" element={<MyProfilePage />} />
@@ -70,6 +71,7 @@ function App() {
                 <Route path="/admin/team" element={<SellersManagementPage />} />
                 <Route path="/admin/commissions" element={<CommissionsPage />} />
                 <Route path="/admin/categories" element={<CategoriesPage />} />
+                <Route path="/admin/storefront" element={<StorefrontSettingsPage />} />
               </Route>
             </Route>
 

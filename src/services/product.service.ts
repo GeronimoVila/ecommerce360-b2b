@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import type { Product, ProductFormData } from '../types/product';
+import type { Product, ProductFormData, TechnicalSpecItem } from '../types/product';
 
 const BASE_PATH = 'products';
 
@@ -12,13 +12,13 @@ export const ProductService = {
     const response = await apiClient.get(`${BASE_PATH}/admin${query}`);
     return response.data.data;
   },
-  
+
   getPosCatalog: async (type?: 'simple' | 'combo'): Promise<Product[]> => {
     const query = type ? `?type=${type}` : '';
     const response = await apiClient.get(`${BASE_PATH}${query}`);
     return response.data.data;
   },
-  
+
   getById: async (id: string): Promise<Product> => {
     const response = await apiClient.get(`${BASE_PATH}/${id}`);
     return response.data;
@@ -32,6 +32,8 @@ export const ProductService = {
   createCombo: async (data: {
     sku: string;
     name: string;
+    description?: string | null;
+    technical_specs?: TechnicalSpecItem[];
     category_id: string;
     base_price: number;
     commission_rate: number;
@@ -41,14 +43,19 @@ export const ProductService = {
     return response.data.combo;
   },
 
-  updateCombo: async (id: string, data: {
-    sku: string;
-    name: string;
-    category_id: string;
-    base_price: number;
-    commission_rate: number;
-    parts: { sku: string; quantity: number }[];
-  }): Promise<Product> => {
+  updateCombo: async (
+    id: string,
+    data: {
+      sku: string;
+      name: string;
+      description?: string | null;
+      technical_specs?: TechnicalSpecItem[];
+      category_id: string;
+      base_price: number;
+      commission_rate: number;
+      parts: { sku: string; quantity: number }[];
+    }
+  ): Promise<Product> => {
     const response = await apiClient.patch(`${BASE_PATH}/combos/${id}`, data);
     return response.data.combo;
   },
